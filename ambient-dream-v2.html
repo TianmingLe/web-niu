@@ -1,0 +1,2602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>沉浸式梦境 - 意识流</title>
+    <!-- 引入 React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <!-- 引入 Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 引入 GSAP 和 Draggable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/Draggable.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #101118;
+            --accent-1: #7f809a;
+            --accent-2: #a895b8;
+            --accent-3: #98aebb;
+            --accent-4: #8fa58f;
+            --panel-bg: rgba(255, 255, 255, 0.06);
+            --panel-border: rgba(255, 255, 255, 0.14);
+            --soft-text: rgba(244, 240, 235, 0.92);
+            --muted-text: rgba(244, 240, 235, 0.52);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            font-family: "Noto Serif SC", "Songti SC", "Georgia", serif;
+            color: var(--soft-text);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        #root {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 复杂的流动背景层 */
+        .ambient-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+            filter: blur(80px);
+            opacity: 0.42;
+        }
+
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            mix-blend-mode: screen;
+            will-change: transform;
+        }
+
+        /* 顶部遮罩，用来加一些噪点质感 */
+        .noise-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 1;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.05;
+            mix-blend-mode: overlay;
+        }
+
+        /* 主视图容器 */
+        .main-stage {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10;
+        }
+
+        /* 活跃文字区 */
+        .active-text-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 900px;
+            text-align: center;
+            pointer-events: none;
+            z-index: 50;
+            perspective: 1000px;
+        }
+
+        .active-text {
+            font-size: 2.5rem;
+            line-height: 1.8;
+            text-shadow: 0 0 18px rgba(255, 245, 235, 0.18), 0 0 36px rgba(152, 174, 187, 0.14);
+            font-weight: 300;
+            letter-spacing: 2px;
+            opacity: 0;
+            will-change: transform, opacity;
+        }
+
+        /* 掉落的便签容器 */
+        .notes-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 20;
+        }
+
+        /* 便签基础样式 */
+        .memory-note {
+            position: absolute;
+            padding: 24px 32px;
+            border-radius: 16px;
+            max-width: 320px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            cursor: grab;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            word-wrap: break-word;
+            will-change: transform, opacity, box-shadow;
+            transform-origin: center center;
+            /* 初始状态由GSAP控制 */
+        }
+
+        .memory-note.focused {
+            box-shadow: 0 18px 60px rgba(255, 245, 235, 0.16);
+        }
+        
+        .memory-note:active {
+            cursor: grabbing;
+        }
+
+        /* 便签主题：深海、幻光、极简线框、霓虹、纸本等 */
+        .theme-glass {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: rgba(248, 243, 239, 0.88);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .theme-abyss {
+            background: rgba(24, 29, 42, 0.62);
+            border: 1px solid rgba(152, 174, 187, 0.18);
+            color: #d9e5eb;
+            box-shadow: 0 10px 40px rgba(90, 110, 120, 0.08);
+        }
+
+        .theme-crimson {
+            background: rgba(68, 46, 57, 0.52);
+            border: 1px solid rgba(220, 192, 198, 0.18);
+            color: #f3e7e9;
+            box-shadow: 0 10px 40px rgba(96, 62, 74, 0.08);
+        }
+
+        .theme-holo {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(168, 149, 184, 0.12), rgba(152, 174, 187, 0.08));
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #f7f3ef;
+            box-shadow: 0 10px 40px rgba(120, 110, 140, 0.12);
+        }
+
+        .theme-paper {
+            background: rgba(236, 231, 222, 0.9);
+            border: 1px solid rgba(195, 184, 166, 0.36);
+            color: #35312d;
+            text-shadow: none;
+            box-shadow: 2px 8px 20px rgba(0, 0, 0, 0.4);
+            font-family: "Georgia", serif;
+        }
+
+        .theme-neon {
+            background: rgba(28, 35, 31, 0.62);
+            border: 1px solid rgba(172, 193, 170, 0.22);
+            color: #e0ebe0;
+            box-shadow: 0 0 15px rgba(143, 165, 143, 0.18), inset 0 0 10px rgba(143, 165, 143, 0.08);
+            text-shadow: 0 0 5px rgba(224, 235, 224, 0.18);
+            font-family: "Courier New", monospace;
+        }
+
+        .theme-blush {
+            background: rgba(133, 94, 112, 0.38);
+            border: 1px solid rgba(244, 215, 226, 0.22);
+            color: #fff4f8;
+            box-shadow: 0 12px 30px rgba(97, 65, 83, 0.18);
+        }
+
+        .theme-lavender {
+            background: rgba(118, 111, 153, 0.34);
+            border: 1px solid rgba(224, 218, 247, 0.22);
+            color: #f6f2ff;
+            box-shadow: 0 12px 30px rgba(90, 84, 124, 0.16);
+        }
+
+        .theme-pearl {
+            background: rgba(241, 233, 228, 0.86);
+            border: 1px solid rgba(214, 200, 193, 0.4);
+            color: #403734;
+            box-shadow: 0 14px 34px rgba(46, 39, 38, 0.16);
+        }
+
+        .theme-sunset {
+            background: rgba(171, 125, 112, 0.36);
+            border: 1px solid rgba(248, 219, 204, 0.22);
+            color: #fff6f0;
+            box-shadow: 0 12px 32px rgba(114, 82, 74, 0.18);
+        }
+
+        .font-serif {
+            font-family: "Noto Serif SC", "Songti SC", "Georgia", serif;
+        }
+
+        .font-kaiti {
+            font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+        }
+
+        .font-fangsong {
+            font-family: "FangSong", "STFangsong", serif;
+        }
+
+        .font-sans {
+            font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+        }
+
+        .font-rounded {
+            font-family: "YouYuan", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        }
+
+        /* 控制面板/操作按钮 */
+        .controls {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            z-index: 100;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+        }
+
+        .controls.compact {
+            gap: 10px;
+        }
+
+        .soft-icon-btn {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            color: var(--soft-text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            font-size: 18px;
+        }
+
+        .soft-icon-btn.label-btn {
+            width: auto;
+            min-width: 52px;
+            padding: 0 16px;
+            border-radius: 999px;
+            font-size: 13px;
+            letter-spacing: 0.08em;
+        }
+
+        .soft-icon-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            transform: scale(1.06);
+            border-color: rgba(255, 255, 255, 0.24);
+        }
+
+        .add-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            color: var(--soft-text);
+            font-size: 28px;
+            font-weight: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .add-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            transform: scale(1.1) rotate(90deg);
+            border-color: rgba(255, 255, 255, 0.28);
+            box-shadow: 0 0 24px rgba(255, 255, 255, 0.08);
+        }
+
+        .music-dock {
+            position: absolute;
+            left: 40px;
+            bottom: 32px;
+            z-index: 100;
+            min-width: 320px;
+            max-width: min(520px, 62vw);
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: rgba(22, 24, 34, 0.64);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+            transition: max-height 0.35s ease, width 0.35s ease, background 0.35s ease, box-shadow 0.35s ease;
+            overflow: hidden;
+        }
+
+        .music-dock.collapsed {
+            width: min(420px, 44vw);
+            min-width: 340px;
+            max-width: min(420px, 44vw);
+            max-height: 72px;
+            background: rgba(22, 24, 34, 0.46);
+        }
+
+        .music-dock.expanded {
+            max-height: 520px;
+        }
+
+        .dock-body {
+            overflow: hidden;
+            transition: max-height 0.35s ease, opacity 0.28s ease, transform 0.28s ease;
+            transform-origin: top;
+        }
+
+        .music-dock.collapsed .dock-body {
+            max-height: 0;
+            opacity: 0;
+            transform: translateY(-6px);
+            pointer-events: none;
+        }
+
+        .music-dock.expanded .dock-body {
+            max-height: 430px;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .music-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: nowrap;
+        }
+
+        .music-dock.collapsed .music-actions {
+            display: none;
+        }
+
+        .panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .panel-head-main {
+            min-width: 0;
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .panel-head-tools {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .music-meta {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .music-label {
+            font-size: 11px;
+            letter-spacing: 0.18em;
+            color: var(--muted-text);
+            margin-bottom: 6px;
+        }
+
+        .music-name {
+            font-size: 14px;
+            color: var(--soft-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .panel-icon-btn {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--muted-text);
+            border-radius: 999px;
+            min-width: 34px;
+            height: 34px;
+            padding: 0 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            transition: all 0.25s ease;
+        }
+
+        .panel-icon-btn:hover,
+        .panel-icon-btn.active {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
+            color: var(--soft-text);
+        }
+
+        .music-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .music-btn {
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--soft-text);
+            border-radius: 999px;
+            padding: 9px 14px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            transition: all 0.25s ease;
+        }
+
+        .music-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.24);
+        }
+
+        .music-foot {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: nowrap;
+        }
+
+        .music-count,
+        .music-tip {
+            font-size: 12px;
+            color: var(--muted-text);
+        }
+
+        .music-time {
+            font-size: 12px;
+            color: rgba(244, 240, 235, 0.72);
+            min-width: 88px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .music-progress {
+            flex: 1;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 999px;
+            overflow: hidden;
+            cursor: pointer;
+            position: relative;
+            touch-action: none;
+        }
+
+        .music-progress > span {
+            display: block;
+            height: 100%;
+            width: var(--progress, 0%);
+            background: linear-gradient(90deg, rgba(235, 230, 224, 0.58), rgba(152, 174, 187, 0.58));
+        }
+
+        .music-progress::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: calc(var(--progress, 0%) - 5px);
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(250, 244, 238, 0.92);
+            transform: translateY(-50%);
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.06);
+        }
+
+        .music-toolbar {
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .music-toolbar-left,
+        .music-toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .volume-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .volume-label {
+            color: var(--muted-text);
+            font-size: 11px;
+            letter-spacing: 0.08em;
+        }
+
+        .volume-slider {
+            width: 78px;
+            accent-color: rgba(235, 230, 224, 0.75);
+            opacity: 0.8;
+            cursor: pointer;
+        }
+
+        .music-mini-btn {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--soft-text);
+            border-radius: 999px;
+            padding: 7px 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            transition: all 0.25s ease;
+        }
+
+        .music-mini-btn:hover,
+        .music-mini-btn.active {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.22);
+        }
+
+        .playlist-panel {
+            margin-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding-top: 12px;
+            max-height: 190px;
+            overflow: auto;
+        }
+
+        .playlist-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+        }
+
+        .playlist-main {
+            min-width: 0;
+            cursor: pointer;
+        }
+
+        .playlist-main strong {
+            display: block;
+            color: var(--soft-text);
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .playlist-main span {
+            display: block;
+            margin-top: 3px;
+            font-size: 11px;
+            color: var(--muted-text);
+        }
+
+        .playlist-row.active .playlist-main strong {
+            color: #fff;
+        }
+
+        .playlist-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tiny-btn {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--soft-text);
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .chapter-badge {
+            position: absolute;
+            left: 38px;
+            top: 32px;
+            z-index: 110;
+            padding: 12px 16px;
+            border-radius: 18px;
+            background: rgba(22, 24, 34, 0.54);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .chapter-badge .stage-name {
+            font-size: 11px;
+            letter-spacing: 0.2em;
+            color: var(--muted-text);
+            margin-bottom: 6px;
+        }
+
+        .chapter-badge .stage-copy {
+            font-size: 14px;
+            color: var(--soft-text);
+        }
+
+        .chapter-subline {
+            margin-top: 8px;
+            font-size: 11px;
+            color: var(--muted-text);
+            letter-spacing: 0.1em;
+        }
+
+        .favorites-panel {
+            position: absolute;
+            right: 40px;
+            top: 32px;
+            z-index: 110;
+            width: min(360px, 34vw);
+            max-height: 38vh;
+            overflow: auto;
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: rgba(22, 24, 34, 0.54);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            transition: max-height 0.35s ease, width 0.35s ease, background 0.35s ease;
+            overflow: hidden;
+        }
+
+        .favorites-panel.collapsed {
+            width: 200px;
+            max-height: 62px;
+            background: rgba(22, 24, 34, 0.44);
+        }
+
+        .favorites-panel.expanded {
+            max-height: 38vh;
+        }
+
+        .favorites-body {
+            overflow: hidden;
+            transition: max-height 0.35s ease, opacity 0.28s ease, transform 0.28s ease;
+        }
+
+        .favorites-panel.collapsed .favorites-body {
+            max-height: 0;
+            opacity: 0;
+            transform: translateY(-6px);
+            pointer-events: none;
+        }
+
+        .favorites-panel.expanded .favorites-body {
+            max-height: 28vh;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .favorites-title {
+            font-size: 11px;
+            letter-spacing: 0.2em;
+            color: var(--muted-text);
+            margin-bottom: 0;
+        }
+
+        .favorites-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .favorites-head-main {
+            cursor: pointer;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .favorites-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .favorite-item {
+            padding: 10px 0;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+            color: var(--soft-text);
+            font-size: 13px;
+            line-height: 1.65;
+            cursor: pointer;
+        }
+
+        .favorite-empty {
+            color: var(--muted-text);
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        .love-side-note {
+            position: absolute;
+            left: 50%;
+            bottom: 72px;
+            transform: translateX(-50%);
+            z-index: 70;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--muted-text);
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: opacity 0.4s ease;
+        }
+
+        /* 模态框 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+
+        .modal-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: rgba(27, 29, 38, 0.76);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 40px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            max-height: min(82vh, 760px);
+            overflow: auto;
+            transform: translateY(30px) scale(0.95);
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-overlay.open .modal-content {
+            transform: translateY(0) scale(1);
+        }
+
+        .modal-content h3 {
+            margin-top: 0;
+            margin-bottom: 24px;
+            font-weight: 400;
+            letter-spacing: 1px;
+            color: var(--soft-text);
+        }
+
+        .modal-content textarea {
+            width: 100%;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            padding: 16px;
+            color: var(--soft-text);
+            font-family: inherit;
+            font-size: 1.1rem;
+            resize: none;
+            outline: none;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+
+        .modal-content textarea:focus {
+            border-color: rgba(255, 255, 255, 0.28);
+        }
+
+        .modal-subtitle {
+            margin: -8px 0 18px;
+            color: var(--muted-text);
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .picker-group {
+            margin-bottom: 18px;
+        }
+
+        .picker-label {
+            margin-bottom: 10px;
+            color: var(--muted-text);
+            font-size: 12px;
+            letter-spacing: 0.12em;
+        }
+
+        .style-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .style-btn {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 247, 241, 0.7);
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .style-btn.selected {
+            background: rgba(255, 255, 255, 0.12);
+            color: var(--soft-text);
+            border-color: rgba(255, 255, 255, 0.26);
+        }
+
+        .style-btn.theme-preview {
+            min-width: 94px;
+        }
+
+        .style-btn.font-preview.font-kaiti {
+            font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+        }
+
+        .style-btn.font-preview.font-fangsong {
+            font-family: "FangSong", "STFangsong", serif;
+        }
+
+        .style-btn.font-preview.font-sans {
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        }
+
+        .style-btn.font-preview.font-rounded {
+            font-family: "YouYuan", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        }
+
+        .directory-modal {
+            max-width: 840px;
+        }
+
+        .directory-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .directory-toolbar-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .quote-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: min(48vh, 460px);
+            overflow: auto;
+            padding-right: 4px;
+            margin-bottom: 18px;
+        }
+
+        .quote-row {
+            padding: 12px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .quote-row-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .quote-index {
+            font-size: 11px;
+            color: var(--muted-text);
+            letter-spacing: 0.14em;
+        }
+
+        .quote-row textarea {
+            min-height: 74px;
+            margin-bottom: 10px;
+            font-size: 0.98rem;
+        }
+
+        .quote-row-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .new-quote-box {
+            border-top: 1px dashed rgba(255, 255, 255, 0.1);
+            padding-top: 16px;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 16px;
+        }
+
+        .action-btn {
+            padding: 10px 24px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        .btn-cancel {
+            background: transparent;
+            color: var(--muted-text);
+        }
+
+        .btn-cancel:hover {
+            color: white;
+        }
+
+        .btn-confirm {
+            background: rgba(238, 232, 225, 0.92);
+            color: #24211f;
+            font-weight: bold;
+        }
+
+        .btn-confirm:hover {
+            background: #f7f1ea;
+            box-shadow: 0 0 18px rgba(255, 244, 232, 0.18);
+        }
+
+        /* 提示信息 */
+        .hint {
+            position: absolute;
+            bottom: 112px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--muted-text);
+            font-size: 0.9rem;
+            letter-spacing: 2px;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        @media (max-width: 820px) {
+            .active-text-container {
+                width: calc(100vw - 40px);
+                max-width: none;
+            }
+
+            .active-text {
+                font-size: 1.35rem;
+                line-height: 1.9;
+                letter-spacing: 1px;
+            }
+
+            .memory-note {
+                max-width: min(72vw, 280px);
+                padding: 18px 20px;
+                font-size: 0.96rem;
+                line-height: 1.55;
+            }
+
+            .chapter-badge {
+                left: 16px;
+                right: 16px;
+                top: 14px;
+                padding: 12px 14px;
+            }
+
+            .favorites-panel {
+                top: 108px;
+                right: 16px;
+                width: calc(100vw - 32px);
+                max-width: none;
+            }
+
+            .favorites-panel.collapsed {
+                width: calc(100vw - 32px);
+                max-height: 56px;
+            }
+
+            .music-dock {
+                left: 16px;
+                right: 16px;
+                bottom: 86px;
+                min-width: 0;
+                width: calc(100vw - 32px);
+                max-width: none;
+                padding: 12px 14px;
+            }
+
+            .music-dock.collapsed {
+                width: calc(100vw - 32px);
+                min-width: 0;
+                max-width: none;
+                max-height: 76px;
+                border-radius: 20px;
+            }
+
+            .music-top,
+            .music-toolbar {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .music-actions,
+            .music-toolbar-left,
+            .music-toolbar-right {
+                width: 100%;
+                justify-content: space-between;
+                flex-wrap: wrap;
+            }
+
+            .music-btn,
+            .music-mini-btn {
+                flex: 1;
+                min-height: 40px;
+                min-width: 88px;
+            }
+
+            .volume-wrap {
+                width: 100%;
+                justify-content: flex-end;
+            }
+
+            .volume-slider {
+                width: min(40vw, 140px);
+            }
+
+            .controls {
+                right: 16px;
+                left: 16px;
+                bottom: 18px;
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 10px;
+                justify-content: stretch;
+            }
+
+            .soft-icon-btn,
+            .add-btn {
+                width: 100%;
+                height: 48px;
+            }
+
+            .soft-icon-btn.label-btn {
+                min-width: 0;
+                height: 46px;
+            }
+
+            .add-btn {
+                font-size: 24px;
+            }
+
+            .hint {
+                bottom: 150px;
+                width: calc(100vw - 48px);
+                text-align: center;
+                font-size: 0.78rem;
+                line-height: 1.6;
+            }
+
+            .love-side-note {
+                left: 16px;
+                right: 16px;
+                bottom: 168px;
+                transform: none;
+                text-align: center;
+                white-space: normal;
+            }
+
+            .modal-content {
+                width: calc(100vw - 24px);
+                padding: 22px 18px;
+                border-radius: 18px;
+            }
+
+            .modal-content h3 {
+                font-size: 1.65rem;
+                margin-bottom: 18px;
+            }
+
+            .modal-content textarea {
+                font-size: 1rem;
+                min-height: 132px;
+                padding: 14px;
+            }
+
+            .style-selector {
+                gap: 8px;
+                margin-bottom: 22px;
+            }
+
+            .style-btn {
+                min-height: 38px;
+            }
+
+            .directory-modal {
+                max-width: none;
+            }
+
+            .directory-toolbar,
+            .directory-toolbar-actions,
+            .quote-row-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .music-foot {
+                align-items: center;
+                flex-wrap: wrap;
+            }
+
+            .music-time {
+                min-width: 0;
+                width: 100%;
+                text-align: left;
+            }
+
+            .main-stage.viewport-mobile-portrait .music-dock {
+                bottom: 76px;
+                border-radius: 22px 22px 16px 16px;
+            }
+
+            .main-stage.viewport-mobile-portrait .favorites-panel {
+                top: 94px;
+            }
+
+            .modal-actions {
+                gap: 10px;
+            }
+
+            .action-btn {
+                flex: 1;
+                min-height: 44px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // 注册 GSAP 插件
+        gsap.registerPlugin(Draggable);
+
+        // 默认文本数据
+        const DEFAULT_COMMENTS = [
+            "黑板上的粉笔灰落在阳光里 像一场无声的雪",
+            "大海是鱼儿的陆地 梦境是爱情的白天",
+            "那些没说出口的喜欢 都化作了教室窗外 迟迟不肯落下的晚霞",
+            "就算是在梦里 就算是宇宙深处 那份爱也永远的留在我心底",
+            "耳机分你一半的旋律里 藏着一整个夏天的欲言又止",
+            "纸飞机划过半空 载着不敢投递的信 最终停在了时光的折痕里"
+        ];
+
+        const THEMES = ['theme-glass', 'theme-abyss', 'theme-crimson', 'theme-holo', 'theme-paper', 'theme-neon', 'theme-blush', 'theme-lavender', 'theme-pearl', 'theme-sunset'];
+        const FONT_PRESETS = ['font-serif', 'font-kaiti', 'font-fangsong', 'font-sans', 'font-rounded'];
+        const STORAGE_KEYS = {
+            favorites: 'ambient-dream-favorites',
+            tracks: 'ambient-dream-tracks',
+            currentTrackIndex: 'ambient-dream-current-track-index',
+            orderMode: 'ambient-dream-order-mode',
+            volume: 'ambient-dream-volume',
+            comments: 'ambient-dream-comments'
+        };
+
+        const safeReadStorage = (key, fallback) => {
+            try {
+                const raw = window.localStorage.getItem(key);
+                return raw ? JSON.parse(raw) : fallback;
+            } catch (error) {
+                return fallback;
+            }
+        };
+
+        const safeWriteStorage = (key, value) => {
+            try {
+                window.localStorage.setItem(key, JSON.stringify(value));
+            } catch (error) {
+                // 本地存储满了时静默降级
+            }
+        };
+
+        const getRandomNotePos = () => {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const noteWidth = width < 820 ? Math.min(220, width * 0.62) : 320;
+            const noteHeight = width < 820 ? 150 : 200;
+            const xPadding = width < 820 ? 12 : 20;
+            const yPaddingTop = width < 820 ? 160 : 20;
+            const yPaddingBottom = width < 820 ? 160 : 24;
+            return {
+                x: Math.max(xPadding, Math.random() * Math.max(40, width - noteWidth - xPadding * 2) + xPadding),
+                y: Math.max(yPaddingTop, Math.random() * Math.max(40, height - noteHeight - yPaddingTop - yPaddingBottom) + yPaddingTop),
+                rot: (Math.random() - 0.5) * (width < 820 ? 18 : 40)
+            };
+        };
+
+        const getViewportProfile = () => {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const ratio = height / Math.max(width, 1);
+            if (width <= 820 && ratio >= 1.12) {
+                return { mode: 'mobile-portrait', width, height, ratio };
+            }
+            if (width <= 980 || height <= 640) {
+                return { mode: 'compact', width, height, ratio };
+            }
+            return { mode: 'desktop', width, height, ratio };
+        };
+
+        const formatTime = (seconds) => {
+            if (!Number.isFinite(seconds) || seconds < 0) return '00:00';
+            const total = Math.floor(seconds);
+            const mm = String(Math.floor(total / 60)).padStart(2, '0');
+            const ss = String(total % 60).padStart(2, '0');
+            return `${mm}:${ss}`;
+        };
+
+        // --- 组件：流体背景 ---
+        const AmbientBackground = ({ bgRef }) => {
+            const containerRef = React.useRef(null);
+
+            React.useEffect(() => {
+                const blobs = containerRef.current.querySelectorAll('.blob');
+                
+                // 给每个blob创建一个随机漂移的动画
+                blobs.forEach(blob => {
+                    gsap.to(blob, {
+                        x: () => Math.random() * window.innerWidth * 0.5 - window.innerWidth * 0.25,
+                        y: () => Math.random() * window.innerHeight * 0.5 - window.innerHeight * 0.25,
+                        duration: () => 10 + Math.random() * 20,
+                        ease: "sine.inOut",
+                        repeat: -1,
+                        yoyo: true,
+                        rotation: () => Math.random() * 360
+                    });
+                });
+            }, []);
+
+            return (
+                <div className="ambient-bg" ref={(node) => {
+                    containerRef.current = node;
+                    if (bgRef) bgRef.current = node;
+                }}>
+                    <div className="blob" style={{width: '60vw', height: '60vw', background: '#807d96', top: '-10%', left: '-10%'}}></div>
+                    <div className="blob" style={{width: '50vw', height: '50vw', background: '#a992ab', bottom: '-10%', right: '-10%'}}></div>
+                    <div className="blob" style={{width: '40vw', height: '40vw', background: '#95adb8', top: '20%', left: '40%'}}></div>
+                    <div className="blob" style={{width: '70vw', height: '70vw', background: '#5b625f', bottom: '10%', left: '-20%'}}></div>
+                </div>
+            );
+        };
+
+        // --- 组件：独立的便签 ---
+        const MemoryNote = ({ id, text, theme, fontClass, initialPos, isFocused, onFocus }) => {
+            const noteRef = React.useRef(null);
+            const hasEnteredRef = React.useRef(false);
+            const longPressTimerRef = React.useRef(null);
+
+            React.useEffect(() => {
+                const el = noteRef.current;
+                // 初始化拖拽
+                Draggable.create(el, {
+                    type: "x,y",
+                    inertia: true, // 如果有插件的话，没有也会降级
+                    onPress: function() {
+                        // 拖拽时：停止随机漂移，置顶，变清晰，放大
+                        gsap.killTweensOf(el);
+                        gsap.to(el, {
+                            scale: 1.1,
+                            opacity: 1,
+                            filter: 'blur(0px)',
+                            zIndex: 1000,
+                            duration: 0.3
+                        });
+                    },
+                    onRelease: function() {
+                        // 松开时：恢复背景状态，但保留当前位置
+                        if (isFocused) {
+                            gsap.to(el, {
+                                scale: 1.06,
+                                opacity: 0.96,
+                                filter: 'blur(0px)',
+                                zIndex: 950,
+                                duration: 0.5
+                            });
+                            return;
+                        }
+                        gsap.to(el, {
+                            scale: 1,
+                            opacity: 0.3, // 比初始稍亮一点代表被触碰过
+                            filter: 'blur(1px)',
+                            zIndex: 20,
+                            duration: 0.8
+                        });
+                    }
+                });
+
+                // Hover 交互
+                const onMouseEnter = () => {
+                    if (Draggable.get(el) && Draggable.get(el).isDragging) return;
+                    gsap.to(el, {
+                        scale: isFocused ? 1.08 : 1.05,
+                        opacity: isFocused ? 1 : 0.9,
+                        filter: 'blur(0px)',
+                        zIndex: isFocused ? 950 : 100,
+                        duration: 0.4,
+                        ease: "power2.out"
+                    });
+                };
+                
+                const onMouseLeave = () => {
+                    if (Draggable.get(el) && Draggable.get(el).isDragging) return;
+                    if (isFocused) {
+                        gsap.to(el, {
+                            scale: 1.06,
+                            opacity: 0.96,
+                            filter: 'blur(0px)',
+                            zIndex: 950,
+                            duration: 0.5,
+                            ease: "power2.inOut"
+                        });
+                        return;
+                    }
+                    gsap.to(el, {
+                        scale: 1,
+                        opacity: 0.2,
+                        filter: 'blur(2px)',
+                        zIndex: 20,
+                        duration: 0.8,
+                        ease: "power2.inOut"
+                    });
+                };
+                const onDoubleClick = () => onFocus?.(id);
+                const clearLongPress = () => {
+                    if (longPressTimerRef.current) {
+                        window.clearTimeout(longPressTimerRef.current);
+                        longPressTimerRef.current = null;
+                    }
+                };
+                const onTouchStart = () => {
+                    clearLongPress();
+                    longPressTimerRef.current = window.setTimeout(() => {
+                        onFocus?.(id);
+                    }, 420);
+                };
+                const onTouchEnd = () => clearLongPress();
+                const onTouchMove = () => clearLongPress();
+
+                el.addEventListener('mouseenter', onMouseEnter);
+                el.addEventListener('mouseleave', onMouseLeave);
+                el.addEventListener('dblclick', onDoubleClick);
+                el.addEventListener('touchstart', onTouchStart, { passive: true });
+                el.addEventListener('touchend', onTouchEnd, { passive: true });
+                el.addEventListener('touchmove', onTouchMove, { passive: true });
+
+                return () => {
+                    clearLongPress();
+                    el.removeEventListener('mouseenter', onMouseEnter);
+                    el.removeEventListener('mouseleave', onMouseLeave);
+                    el.removeEventListener('dblclick', onDoubleClick);
+                    el.removeEventListener('touchstart', onTouchStart);
+                    el.removeEventListener('touchend', onTouchEnd);
+                    el.removeEventListener('touchmove', onTouchMove);
+                    const d = Draggable.get(el);
+                    if (d) d.kill();
+                };
+            }, [id, isFocused, onFocus]);
+
+            React.useEffect(() => {
+                const el = noteRef.current;
+                if (!el) return;
+                if (!hasEnteredRef.current) {
+                    hasEnteredRef.current = true;
+                    gsap.fromTo(el,
+                        {
+                            x: window.innerWidth / 2 - 150,
+                            y: window.innerHeight / 2 - 50,
+                            scale: 1.5,
+                            opacity: 1,
+                            rotation: 0,
+                            filter: 'blur(0px)'
+                        },
+                        {
+                            x: initialPos.x,
+                            y: initialPos.y,
+                            scale: 1,
+                            opacity: 0.15,
+                            rotation: initialPos.rot,
+                            filter: 'blur(2px)',
+                            duration: 3,
+                            ease: "power3.out"
+                        }
+                    );
+                    return;
+                }
+
+                gsap.to(el, {
+                    x: initialPos.x,
+                    y: initialPos.y,
+                    rotation: initialPos.rot,
+                    duration: 0.85,
+                    ease: "power2.out"
+                });
+            }, [initialPos]);
+
+            React.useEffect(() => {
+                const el = noteRef.current;
+                if (!el) return;
+                if (isFocused) {
+                    gsap.killTweensOf(el);
+                    gsap.to(el, {
+                        scale: 1.06,
+                        opacity: 0.96,
+                        filter: 'blur(0px)',
+                        zIndex: 950,
+                        duration: 0.6,
+                        ease: "power2.out"
+                    });
+                } else {
+                    gsap.to(el, {
+                        scale: 1,
+                        opacity: 0.2,
+                        filter: 'blur(2px)',
+                        zIndex: 20,
+                        duration: 0.8,
+                        ease: "power2.out"
+                    });
+                }
+            }, [isFocused]);
+
+            return (
+                <div ref={noteRef} className={`memory-note ${theme} ${fontClass || 'font-serif'} ${isFocused ? 'focused' : ''}`} title="双击或长按置顶这一句">
+                    {text}
+                </div>
+            );
+        };
+
+        // --- 主应用 ---
+        const App = () => {
+            const [comments, setComments] = React.useState([]);
+            const [currentIndex, setCurrentIndex] = React.useState(0);
+            const [droppedNotes, setDroppedNotes] = React.useState([]);
+            const [focusedNoteId, setFocusedNoteId] = React.useState(null);
+            const [isAnimating, setIsAnimating] = React.useState(false);
+            const [isModalOpen, setIsModalOpen] = React.useState(false);
+            const [isDirectoryOpen, setIsDirectoryOpen] = React.useState(false);
+            const [tracks, setTracks] = React.useState(() => safeReadStorage(STORAGE_KEYS.tracks, []));
+            const [currentTrackIndex, setCurrentTrackIndex] = React.useState(() => safeReadStorage(STORAGE_KEYS.currentTrackIndex, -1));
+            const [isPlaying, setIsPlaying] = React.useState(false);
+            const [progress, setProgress] = React.useState(0);
+            const [currentTime, setCurrentTime] = React.useState(0);
+            const [volume, setVolume] = React.useState(() => safeReadStorage(STORAGE_KEYS.volume, 0.58));
+            const [orderMode, setOrderMode] = React.useState(() => safeReadStorage(STORAGE_KEYS.orderMode, 'sequential')); // 'sequential' | 'loop_one' | 'shuffle'
+            const [favorites, setFavorites] = React.useState(() => safeReadStorage(STORAGE_KEYS.favorites, []));
+            const [musicDockOpen, setMusicDockOpen] = React.useState(false);
+            const [favoritesOpen, setFavoritesOpen] = React.useState(false);
+            const [musicDockPinned, setMusicDockPinned] = React.useState(false);
+            const [favoritesPinned, setFavoritesPinned] = React.useState(false);
+            const [audioEnergy, setAudioEnergy] = React.useState(0);
+            const [isAutoReading, setIsAutoReading] = React.useState(false);
+            const [viewportProfile, setViewportProfile] = React.useState(() => getViewportProfile());
+            
+            const activeTextRef = React.useRef(null);
+            const wheelAcc = React.useRef(0);
+            const audioRef = React.useRef(null);
+            const fileInputRef = React.useRef(null);
+            const audioContextRef = React.useRef(null);
+            const analyserRef = React.useRef(null);
+            const sourceRef = React.useRef(null);
+            const ambientBgRef = React.useRef(null);
+            const progressRef = React.useRef(null);
+            const audioEnergyRef = React.useRef(0);
+            const lastEnergyUiUpdateRef = React.useRef(0);
+            const displayedAudioEnergyRef = React.useRef(0);
+            const seekCleanupRef = React.useRef(null);
+
+            // 初始化数据
+            React.useEffect(() => {
+                const storedComments = safeReadStorage(STORAGE_KEYS.comments, null);
+                if (Array.isArray(storedComments) && storedComments.length) {
+                    setComments(storedComments);
+                    return;
+                }
+                fetch('comments.json')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && data.length > 0) {
+                            setComments(data);
+                        } else {
+                            setComments(DEFAULT_COMMENTS);
+                        }
+                    })
+                    .catch(() => {
+                        setComments(DEFAULT_COMMENTS);
+                    });
+            }, []);
+
+            React.useEffect(() => {
+                audioRef.current = new Audio();
+                const audio = audioRef.current;
+                audio.volume = volume;
+                const handleTime = () => {
+                    if (!audio.duration) return;
+                    setCurrentTime(audio.currentTime);
+                    setProgress((audio.currentTime / audio.duration) * 100);
+                };
+                audio.addEventListener('timeupdate', handleTime);
+                return () => {
+                    audio.pause();
+                    audio.removeEventListener('timeupdate', handleTime);
+                    tracks.forEach(track => {
+                        if (track.url.startsWith('blob:')) URL.revokeObjectURL(track.url);
+                    });
+                };
+            }, []);
+
+            React.useEffect(() => {
+                safeWriteStorage(STORAGE_KEYS.comments, comments);
+            }, [comments]);
+
+            React.useEffect(() => {
+                safeWriteStorage(STORAGE_KEYS.volume, volume);
+            }, [volume]);
+
+            React.useEffect(() => {
+                safeWriteStorage(STORAGE_KEYS.orderMode, orderMode);
+            }, [orderMode]);
+
+            React.useEffect(() => {
+                safeWriteStorage(STORAGE_KEYS.favorites, favorites);
+            }, [favorites]);
+
+            React.useEffect(() => {
+                safeWriteStorage(STORAGE_KEYS.tracks, tracks);
+            }, [tracks]);
+
+            React.useEffect(() => {
+                safeWriteStorage(STORAGE_KEYS.currentTrackIndex, currentTrackIndex);
+            }, [currentTrackIndex]);
+
+            React.useEffect(() => {
+                const audio = audioRef.current;
+                if (audio) audio.volume = volume;
+            }, [volume]);
+
+            React.useEffect(() => {
+                const audio = audioRef.current;
+                if (!audio || audioContextRef.current) return;
+                const setup = () => {
+                    if (audioContextRef.current) return;
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioCtx) return;
+                    const ctx = new AudioCtx();
+                    const analyser = ctx.createAnalyser();
+                    analyser.fftSize = 128;
+                    const source = ctx.createMediaElementSource(audio);
+                    source.connect(analyser);
+                    analyser.connect(ctx.destination);
+                    audioContextRef.current = ctx;
+                    analyserRef.current = analyser;
+                    sourceRef.current = source;
+                    ctx.resume().catch(() => {});
+                };
+                audio.addEventListener('play', setup, { once: true });
+                return () => {
+                    audio.removeEventListener('play', setup);
+                };
+            }, []);
+
+            React.useEffect(() => {
+                let rafId = null;
+                const tick = () => {
+                    const analyser = analyserRef.current;
+                    const bg = ambientBgRef.current;
+                    if (analyser && bg && isPlaying) {
+                        const data = new Uint8Array(analyser.frequencyBinCount);
+                        analyser.getByteFrequencyData(data);
+                        const avg = data.reduce((sum, val) => sum + val, 0) / data.length / 255;
+                        audioEnergyRef.current = avg;
+                        const now = performance.now();
+                        if (now - lastEnergyUiUpdateRef.current > 260 || Math.abs(avg - displayedAudioEnergyRef.current) > 0.07) {
+                            lastEnergyUiUpdateRef.current = now;
+                            displayedAudioEnergyRef.current = avg;
+                            setAudioEnergy(avg);
+                        }
+                        const blur = 80 + avg * 1.4;
+                        const opacity = 0.42 + avg * 0.018;
+                        bg.style.filter = `blur(${blur.toFixed(2)}px) brightness(${(1 + avg * 0.018).toFixed(3)})`;
+                        bg.style.opacity = opacity.toFixed(3);
+                    } else if (bg) {
+                        bg.style.filter = 'blur(80px) brightness(1)';
+                        bg.style.opacity = '0.42';
+                        audioEnergyRef.current = 0;
+                        if (displayedAudioEnergyRef.current !== 0) {
+                            displayedAudioEnergyRef.current = 0;
+                            setAudioEnergy(0);
+                        }
+                    }
+                    rafId = requestAnimationFrame(tick);
+                };
+                rafId = requestAnimationFrame(tick);
+                return () => cancelAnimationFrame(rafId);
+            }, [isPlaying]);
+
+            React.useEffect(() => {
+                const audio = audioRef.current;
+                if (!audio) return;
+                const onEnded = () => {
+                    if (!tracks.length) { setIsPlaying(false); setProgress(0); return; }
+                    if (orderMode === 'loop_one') {
+                        audio.currentTime = 0;
+                        audio.play().catch(()=>{});
+                        setIsPlaying(true);
+                        return;
+                    }
+                    if (orderMode === 'shuffle') {
+                        let ni = Math.floor(Math.random() * tracks.length);
+                        if (tracks.length > 1 && ni === currentTrackIndex) ni = (ni + 1) % tracks.length;
+                        setCurrentTrackIndex(ni);
+                        setIsPlaying(true);
+                        return;
+                    }
+                    const ni = (currentTrackIndex + 1) % tracks.length;
+                    setCurrentTrackIndex(ni);
+                    setIsPlaying(true);
+                };
+                audio.addEventListener('ended', onEnded);
+                return () => {
+                    audio.removeEventListener('ended', onEnded);
+                };
+            }, [orderMode, tracks, currentTrackIndex]);
+
+            // 加载默认曲库：解析 /music/ 目录列表
+            React.useEffect(() => {
+                (async () => {
+                    try {
+                        const res = await fetch('/music/');
+                        if (!res.ok) return;
+                        const html = await res.text();
+                        const doc = new DOMParser().parseFromString(html, 'text/html');
+                        const as = Array.from(doc.querySelectorAll('a'));
+                        const candidates = as
+                            .map(a => a.getAttribute('href') || '')
+                            .filter(href => /\.(mp3|wav|ogg)$/i.test(href))
+                            .map(href => {
+                                // 目录列表中的链接可能是相对路径
+                                const url = href.startsWith('http') ? href : `/music/${href}`.replace('/music//','/music/');
+                                const last = decodeURIComponent(url.split('/').pop() || '');
+                                const name = last.replace(/\.[^/.]+$/, '');
+                                return { id: `lib-${name}-${Date.now()}-${Math.random()}`, name, url, source: 'library' };
+                            });
+                        if (candidates.length) {
+                            setTracks(prev => {
+                                const seen = new Set();
+                                const next = [...prev, ...candidates].filter(track => {
+                                    const key = track.url || `${track.name}-${track.id}`;
+                                    if (seen.has(key)) return false;
+                                    seen.add(key);
+                                    return true;
+                                });
+                                if (next.length && currentTrackIndex === -1) setCurrentTrackIndex(0);
+                                return next;
+                            });
+                        }
+                    } catch (e) {
+                        // 静默降级
+                    }
+                })();
+            }, []);
+
+            React.useEffect(() => {
+                const audio = audioRef.current;
+                if (!audio || currentTrackIndex < 0 || !tracks[currentTrackIndex]) return;
+                audio.src = tracks[currentTrackIndex].url;
+                setCurrentTime(0);
+                setProgress(0);
+                if (isPlaying) {
+                    audio.play().catch(() => setIsPlaying(false));
+                }
+            }, [currentTrackIndex, tracks]);
+
+            React.useEffect(() => {
+                const audio = audioRef.current;
+                if (!audio || currentTrackIndex < 0) return;
+                if (isPlaying) {
+                    audio.play().catch(() => setIsPlaying(false));
+                } else {
+                    audio.pause();
+                }
+            }, [isPlaying, currentTrackIndex]);
+
+            React.useEffect(() => {
+                if (!isAutoReading || isModalOpen) return;
+                const timer = window.setInterval(() => {
+                    if (!isAnimating) handleNext();
+                }, 5600);
+                return () => window.clearInterval(timer);
+            }, [isAutoReading, isModalOpen, isAnimating, currentIndex, comments.length]);
+
+            React.useEffect(() => {
+                const handleResize = () => {
+                    setViewportProfile(getViewportProfile());
+                    setDroppedNotes(prev => prev.map(note => {
+                        const width = window.innerWidth;
+                        const height = window.innerHeight;
+                        const maxX = Math.max(12, width - (width < 820 ? 230 : 340));
+                        const maxY = Math.max(150, height - (width < 820 ? 220 : 180));
+                        return {
+                            ...note,
+                            pos: {
+                                ...note.pos,
+                                x: Math.min(Math.max(12, note.pos.x), maxX),
+                                y: Math.min(Math.max(width < 820 ? 110 : 24, note.pos.y), maxY)
+                            }
+                        };
+                    }));
+                };
+
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            React.useEffect(() => {
+                document.body.dataset.viewportMode = viewportProfile.mode;
+            }, [viewportProfile]);
+
+            React.useEffect(() => {
+                if (!tracks.length && currentTrackIndex !== -1) {
+                    setCurrentTrackIndex(-1);
+                    return;
+                }
+                if (tracks.length && currentTrackIndex >= tracks.length) {
+                    setCurrentTrackIndex(tracks.length - 1);
+                }
+            }, [tracks, currentTrackIndex]);
+
+            React.useEffect(() => {
+                if (!comments.length) return;
+                if (currentIndex >= comments.length) {
+                    setCurrentIndex(Math.max(0, comments.length - 1));
+                }
+            }, [comments, currentIndex]);
+
+            // 首次显示第一句话
+            React.useEffect(() => {
+                if (comments.length > 0 && activeTextRef.current) {
+                    gsap.to(activeTextRef.current, {
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        filter: 'blur(0px)',
+                        duration: 2,
+                        ease: "power3.out"
+                    });
+                }
+            }, [comments]);
+
+            // 触发翻页逻辑
+            const handleNext = React.useCallback(() => {
+                if (isAnimating || comments.length === 0) return;
+                setIsAnimating(true);
+
+                const currentText = comments[currentIndex];
+                
+                // 1. 将当前文字丢落为便签
+                const newNote = {
+                    id: Date.now() + Math.random(),
+                    text: currentText,
+                    theme: THEMES[Math.floor(Math.random() * THEMES.length)],
+                    fontClass: FONT_PRESETS[Math.floor(Math.random() * FONT_PRESETS.length)],
+                    pos: getRandomNotePos()
+                };
+                
+                setDroppedNotes(prev => [...prev, newNote]);
+
+                // 2. 主动效：中心文字消失
+                gsap.to(activeTextRef.current, {
+                    opacity: 0,
+                    y: -40,
+                    scale: 1.1,
+                    filter: 'blur(10px)',
+                    duration: 1.5,
+                    ease: "power2.inOut",
+                    onComplete: () => {
+                        // 切换索引
+                        const nextIdx = (currentIndex + 1) % comments.length;
+                        setCurrentIndex(nextIdx);
+                        
+                        // 重置位置准备入场
+                        gsap.set(activeTextRef.current, {
+                            y: 40,
+                            scale: 0.9,
+                            filter: 'blur(10px)'
+                        });
+
+                        // 3. 下一句话入场
+                        gsap.to(activeTextRef.current, {
+                            opacity: 1,
+                            y: 0,
+                            scale: 1,
+                            filter: 'blur(0px)',
+                            duration: 2,
+                            ease: "power3.out",
+                            delay: 0.5, // 留一点呼吸感
+                            onComplete: () => {
+                                setIsAnimating(false);
+                                wheelAcc.current = 0; // 重置滚轮累计
+                            }
+                        });
+                    }
+                });
+            }, [isAnimating, comments, currentIndex]);
+
+            // 监听全局滚轮和触摸滑动
+            React.useEffect(() => {
+                const handleWheel = (e) => {
+                    e.preventDefault();
+                    if (isAnimating || isModalOpen) return;
+                    
+                    if (e.deltaY > 0) {
+                        wheelAcc.current += e.deltaY;
+                        if (wheelAcc.current > 300) { // 阈值
+                            handleNext();
+                        }
+                    }
+                };
+
+                let touchStartY = 0;
+                const handleTouchStart = (e) => {
+                    touchStartY = e.touches[0].clientY;
+                };
+                const handleTouchMove = (e) => {
+                    e.preventDefault();
+                    if (isAnimating || isModalOpen) return;
+                    const deltaY = touchStartY - e.touches[0].clientY;
+                    if (deltaY > 60) {
+                        handleNext();
+                        touchStartY = e.touches[0].clientY;
+                    }
+                };
+
+                window.addEventListener('wheel', handleWheel, { passive: false });
+                window.addEventListener('touchstart', handleTouchStart, { passive: false });
+                window.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+                return () => {
+                    window.removeEventListener('wheel', handleWheel);
+                    window.removeEventListener('touchstart', handleTouchStart);
+                    window.removeEventListener('touchmove', handleTouchMove);
+                };
+            }, [isAnimating, isModalOpen, currentIndex, comments.length]);
+
+            // 添加自定义便签
+            const handleAddCustomNote = (text, theme, fontClass) => {
+                const newNote = {
+                    id: Date.now() + Math.random(),
+                    text: text,
+                    theme: theme,
+                    fontClass: fontClass || 'font-serif',
+                    pos: getRandomNotePos()
+                };
+                setDroppedNotes(prev => [...prev, newNote]);
+            };
+
+            const clearAllNotes = () => {
+                setDroppedNotes([]);
+                setFocusedNoteId(null);
+            };
+
+            const arrangeNotes = () => {
+                const cols = window.innerWidth < 820 ? 2 : 3;
+                const cardWidth = window.innerWidth < 820 ? Math.min(160, (window.innerWidth - 60) / cols) : 240;
+                const gapX = window.innerWidth < 820 ? 12 : 20;
+                const gapY = window.innerWidth < 820 ? 14 : 18;
+                setFocusedNoteId(null);
+                setDroppedNotes(prev => prev.map((note, index) => {
+                    const col = index % cols;
+                    const row = Math.floor(index / cols);
+                    return {
+                        ...note,
+                        pos: {
+                            x: 18 + col * (cardWidth + gapX),
+                            y: 96 + row * (112 + gapY),
+                            rot: (col - 1) * 2
+                        }
+                    };
+                }));
+            };
+
+            const handleMusicUpload = (event) => {
+                const files = Array.from(event.target.files || []).filter(file => file.type.startsWith('audio/'));
+                if (!files.length) return;
+                Promise.all(files.map(file => new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve({
+                        id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
+                        name: file.name.replace(/\.[^/.]+$/, ''),
+                        url: reader.result,
+                        source: 'upload'
+                    });
+                    reader.readAsDataURL(file);
+                }))).then((uploaded) => {
+                    setTracks(prev => {
+                        const next = [...prev, ...uploaded];
+                        if (currentTrackIndex === -1 && next.length) {
+                            setCurrentTrackIndex(0);
+                        }
+                        return next;
+                    });
+                });
+                event.target.value = '';
+            };
+
+            const togglePlayback = () => {
+                if (!tracks.length) return;
+                audioContextRef.current?.resume?.().catch(() => {});
+                if (currentTrackIndex === -1) {
+                    setCurrentTrackIndex(0);
+                    setIsPlaying(true);
+                    return;
+                }
+                setIsPlaying(prev => !prev);
+            };
+
+            const handleSeek = React.useCallback((event) => {
+                const audio = audioRef.current;
+                const bar = progressRef.current;
+                if (!audio || !bar || !audio.duration) return;
+                const rect = bar.getBoundingClientRect();
+                const clientX = event.touches?.[0]?.clientX ?? event.clientX;
+                const ratio = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+                audio.currentTime = audio.duration * ratio;
+                setCurrentTime(audio.currentTime);
+                setProgress(ratio * 100);
+            }, []);
+
+            const beginSeekDrag = (event) => {
+                event.preventDefault();
+                handleSeek(event);
+                const move = (moveEvent) => handleSeek(moveEvent);
+                const end = () => {
+                    window.removeEventListener('mousemove', move);
+                    window.removeEventListener('mouseup', end);
+                    window.removeEventListener('touchmove', move);
+                    window.removeEventListener('touchend', end);
+                };
+                seekCleanupRef.current?.();
+                seekCleanupRef.current = end;
+                window.addEventListener('mousemove', move);
+                window.addEventListener('mouseup', end);
+                window.addEventListener('touchmove', move, { passive: false });
+                window.addEventListener('touchend', end);
+            };
+
+            React.useEffect(() => {
+                return () => {
+                    seekCleanupRef.current?.();
+                };
+            }, []);
+
+            const nextTrack = () => {
+                if (!tracks.length) return;
+                if (orderMode === 'loop_one') {
+                    // 保持当前索引，重新播放
+                    setIsPlaying(true);
+                    audioRef.current && (audioRef.current.currentTime = 0);
+                    return;
+                }
+                if (orderMode === 'shuffle') {
+                    let ni = Math.floor(Math.random() * tracks.length);
+                    if (tracks.length > 1 && ni === currentTrackIndex) {
+                        ni = (ni + 1) % tracks.length;
+                    }
+                    setCurrentTrackIndex(ni);
+                    setIsPlaying(true);
+                    return;
+                }
+                // 顺序
+                const ni = (currentTrackIndex + 1) % tracks.length;
+                setCurrentTrackIndex(ni);
+                setIsPlaying(true);
+            };
+
+            const prevTrack = () => {
+                if (!tracks.length) return;
+                if (orderMode === 'shuffle') {
+                    let ni = Math.floor(Math.random() * tracks.length);
+                    if (tracks.length > 1 && ni === currentTrackIndex) {
+                        ni = (ni + tracks.length - 1) % tracks.length;
+                    }
+                    setCurrentTrackIndex(ni);
+                    setIsPlaying(true);
+                    return;
+                }
+                const pi = (currentTrackIndex - 1 + tracks.length) % tracks.length;
+                setCurrentTrackIndex(pi);
+                setIsPlaying(true);
+            };
+
+            const cycleOrderMode = () => {
+                setOrderMode(m => m === 'sequential' ? 'loop_one' : m === 'loop_one' ? 'shuffle' : 'sequential');
+            };
+
+            const moveTrack = (index, dir) => {
+                setTracks(prev => {
+                    const a = [...prev];
+                    const ni = index + dir;
+                    if (ni < 0 || ni >= a.length) return prev;
+                    const tmp = a[index];
+                    a[index] = a[ni];
+                    a[ni] = tmp;
+                    // 调整当前索引
+                    if (currentTrackIndex === index) setCurrentTrackIndex(ni);
+                    else if (currentTrackIndex === ni) setCurrentTrackIndex(index);
+                    return a;
+                });
+            };
+
+            const removeTrack = (index) => {
+                setTracks(prev => {
+                    const a = [...prev];
+                    a.splice(index,1);
+                    if (!a.length) {
+                        setCurrentTrackIndex(-1);
+                        setIsPlaying(false);
+                    } else if (index === currentTrackIndex) {
+                        setCurrentTrackIndex(index % a.length);
+                    } else if (index < currentTrackIndex) {
+                        setCurrentTrackIndex(currentTrackIndex - 1);
+                    }
+                    return a;
+                });
+            };
+
+            const playAt = (index) => {
+                if (index < 0 || index >= tracks.length) return;
+                setCurrentTrackIndex(index);
+                setIsPlaying(true);
+            };
+
+            // 收藏当前句子
+            const addFavorite = () => {
+                const t = comments[currentIndex] || '';
+                if (!t) return;
+                setFavorites(prev => prev.includes(t) ? prev : [t, ...prev].slice(0, 50));
+                setFavoritesOpen(true);
+            };
+
+            const jumpToFavorite = (t) => {
+                const i = comments.indexOf(t);
+                if (i >= 0) {
+                    // 直接切换中心文案（不丢动画节奏）
+                    if (!isAnimating) {
+                        setIsAnimating(true);
+                        gsap.to(activeTextRef.current, {
+                            opacity: 0, y: -30, scale: 1.04, filter: 'blur(8px)', duration: 1.2, ease: "power2.inOut",
+                            onComplete: () => {
+                                setCurrentIndex(i);
+                                gsap.set(activeTextRef.current, { y: 30, scale: .96, filter: 'blur(8px)' });
+                                gsap.to(activeTextRef.current, { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 1.6, ease: "power3.out",
+                                    onComplete: () => setIsAnimating(false)
+                                });
+                            }
+                        });
+                    }
+                }
+            };
+
+            const chapterInfo = React.useMemo(() => {
+                const currentText = comments[currentIndex] || '';
+                if (!currentText) return { stage: 'STAGE', copy: '加载中', aside: '青春有时候只是把一句喜欢放得更轻一点。', mood: 'soft' };
+                const earlyHits = /粉笔|教室|窗外|纸飞机|晚自习|课桌|夏天/.test(currentText);
+                const midnightHits = /大海|梦|耳机|海风|夜|宇宙|心底/.test(currentText);
+                const lateHits = /晚霞|黄昏|时光|分别|落下/.test(currentText);
+                if (earlyHits) {
+                    return {
+                        stage: 'EARLY SUMMER',
+                        copy: '在粉笔灰与风铃里，第一次学会把一句话藏到很晚。',
+                        aside: '像放学路上并肩走着，却谁也舍不得先说破。',
+                        mood: 'school'
+                    };
+                }
+                if (midnightHits) {
+                    return {
+                        stage: 'MIDSUMMER NIGHT',
+                        copy: '我们把未说出的名字交给海风，等潮水退去时再找。',
+                        aside: '喜欢在耳机里绕了一圈，回来时已经比夜色更轻。',
+                        mood: 'night'
+                    };
+                }
+                if (lateHits) {
+                    return {
+                        stage: 'LATE LIGHT',
+                        copy: '分别那天的夕阳很慢，于是我决定把黄昏收藏起来。',
+                        aside: '不是所有告别都响亮，有些只是把手放慢了一点。',
+                        mood: 'sunset'
+                    };
+                }
+                return {
+                    stage: currentIndex < comments.length * 0.5 ? 'EARLY SUMMER' : 'LATE LIGHT',
+                    copy: currentIndex < comments.length * 0.5 ? '风和心事都还很轻，适合把喜欢写得含蓄一点。' : '时间把故事推远了，但那份柔软还停在原地。',
+                    aside: '你没回头，但那一刻的空气替你停了一会儿。',
+                    mood: 'soft'
+                };
+            }, [currentIndex, comments]);
+
+            const loveAside = React.useMemo(() => {
+                const moodLines = {
+                    school: [
+                        '有些喜欢，不说破，刚好能陪一个夏天。',
+                        '再慢一点读，就像晚自习后一起走回家。'
+                    ],
+                    night: [
+                        '风吹过来时，像有人替我轻轻回答了你。',
+                        '耳机里的副歌绕回来，刚好碰见心跳最慢的地方。'
+                    ],
+                    sunset: [
+                        '你没回头，但黄昏替你停了一会儿。',
+                        '我把想说的话放进晚霞里，让天色替我保密。'
+                    ],
+                    soft: [
+                        '喜欢有时候不需要证据，只需要一阵风记得。',
+                        '我把心事写得很轻，只怕惊动了你。'
+                    ]
+                };
+                const lines = moodLines[chapterInfo.mood] || moodLines.soft;
+                return lines[currentIndex % lines.length];
+            }, [currentIndex, chapterInfo]);
+
+            const toggleNoteFocus = (noteId) => {
+                setFocusedNoteId(prev => prev === noteId ? null : noteId);
+            };
+
+            return (
+                <div className={`main-stage viewport-${viewportProfile.mode}`}>
+                    <AmbientBackground bgRef={ambientBgRef} />
+                    <div className="noise-overlay"></div>
+                    
+                    {/* 掉落层 */}
+                    <div className="notes-layer">
+                        {droppedNotes.map(note => (
+                            <MemoryNote 
+                                key={note.id} 
+                                id={note.id}
+                                text={note.text} 
+                                theme={note.theme} 
+                                fontClass={note.fontClass}
+                                initialPos={note.pos} 
+                                isFocused={focusedNoteId === note.id}
+                                onFocus={toggleNoteFocus}
+                            />
+                        ))}
+                    </div>
+
+                    {/* 中心活跃层 */}
+                    <div className="active-text-container">
+                        <div 
+                            ref={activeTextRef} 
+                            className="active-text"
+                            style={{ opacity: 0, transform: 'translateY(40px) scale(0.9)', filter: 'blur(10px)' }}
+                        >
+                            {comments.length > 0 ? comments[currentIndex] : "加载中..."}
+                        </div>
+                    </div>
+
+                    <div className="hint">滚动鼠标或上滑屏幕，潜入意识深处</div>
+                    <div className="love-side-note">{loveAside}</div>
+
+                    <div
+                        className={`music-dock ${(musicDockOpen || musicDockPinned) ? 'expanded' : 'collapsed'}`}
+                        onMouseEnter={() => setMusicDockOpen(true)}
+                        onMouseLeave={() => !musicDockPinned && setMusicDockOpen(false)}
+                    >
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="audio/*"
+                            multiple
+                            style={{ display: 'none' }}
+                            onChange={handleMusicUpload}
+                        />
+                        <div className="music-top">
+                            <div className="panel-head">
+                                <div className="panel-head-main music-meta" onClick={() => setMusicDockOpen(prev => !prev)}>
+                                    <div className="music-label">MUSIC FOR THIS DREAM</div>
+                                    <div className="music-name">
+                                        {tracks.length
+                                            ? (tracks[currentTrackIndex]?.name || '已上传音乐，等待播放')
+                                            : '还没有音乐，点击右侧上传'}
+                                    </div>
+                                </div>
+                                <div className="panel-head-tools">
+                                    <button
+                                        className={`panel-icon-btn ${musicDockPinned ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setMusicDockPinned(prev => !prev);
+                                            setMusicDockOpen(true);
+                                        }}
+                                        title="锁定音乐坞"
+                                    >
+                                        钉
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="music-actions">
+                                <button className="music-btn" onClick={() => fileInputRef.current?.click()}>
+                                    上传音乐
+                                </button>
+                                <button className="music-btn" onClick={togglePlayback}>
+                                    {isPlaying ? '暂停' : '播放'}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="dock-body">
+                            <div className="music-foot">
+                                <div className="music-count">{tracks.length ? `已载入 ${tracks.length} 首` : '支持 mp3 / wav / ogg'}</div>
+                                <div
+                                    ref={progressRef}
+                                    className="music-progress"
+                                    style={{ '--progress': `${progress}%` }}
+                                    onClick={handleSeek}
+                                    onMouseDown={beginSeekDrag}
+                                    onTouchStart={beginSeekDrag}
+                                >
+                                    <span></span>
+                                </div>
+                                <div className="music-time">{formatTime(currentTime)} / {formatTime(audioRef.current?.duration || 0)}</div>
+                                <div className="music-tip">{isPlaying ? `播放中 ${Math.round(audioEnergy * 100)}%` : '静置中'}</div>
+                            </div>
+                            <div className="music-toolbar">
+                                <div className="music-toolbar-left">
+                                    <button className="music-mini-btn" onClick={prevTrack}>上一首</button>
+                                    <button className="music-mini-btn" onClick={nextTrack}>下一首</button>
+                                </div>
+                                <div className="music-toolbar-right">
+                                    <button className={`music-mini-btn ${orderMode==='sequential'?'active':''}`} onClick={cycleOrderMode}>
+                                        {orderMode === 'sequential' ? '顺序' : orderMode === 'loop_one' ? '单曲' : '随机'}
+                                    </button>
+                                    <div className="volume-wrap">
+                                        <span className="volume-label">VOL</span>
+                                        <input
+                                            className="volume-slider"
+                                            type="range"
+                                            min="0"
+                                            max="1"
+                                            step="0.01"
+                                            value={volume}
+                                            onChange={(e) => setVolume(Number(e.target.value))}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            {tracks.length > 0 && (
+                              <div className="playlist-panel">
+                                  {tracks.map((tr, i) => (
+                                      <div className={`playlist-row ${i===currentTrackIndex?'active':''}`} key={tr.id}>
+                                          <div className="playlist-main" onClick={() => playAt(i)}>
+                                              <strong>{tr.name}</strong>
+                                              <span>{i===currentTrackIndex ? (isPlaying ? '正在播放' : '已暂停') : '点击播放'}</span>
+                                          </div>
+                                          <div className="playlist-actions">
+                                              <button className="tiny-btn" title="上移" onClick={() => moveTrack(i,-1)}>↑</button>
+                                              <button className="tiny-btn" title="下移" onClick={() => moveTrack(i, 1)}>↓</button>
+                                              <button className="tiny-btn" title="删除" onClick={() => removeTrack(i)}>✕</button>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="controls">
+                        <div className="soft-icon-btn" title="收藏当前句子" onClick={addFavorite}>♥</div>
+                        <div className="soft-icon-btn label-btn" title="语录目录" onClick={() => {
+                            setIsModalOpen(false);
+                            setIsDirectoryOpen(true);
+                        }}>目录</div>
+                        <div className="soft-icon-btn label-btn" title="自动阅读" onClick={() => setIsAutoReading(prev => !prev)}>
+                            {isAutoReading ? '停读' : '自读'}
+                        </div>
+                        <div className="soft-icon-btn label-btn" title="整理便签" onClick={arrangeNotes}>整理</div>
+                        <div className="soft-icon-btn label-btn" title="清空便签" onClick={clearAllNotes}>清空</div>
+                        <div className="add-btn" onClick={() => {
+                            setIsDirectoryOpen(false);
+                            setIsModalOpen(true);
+                        }}>+</div>
+                    </div>
+
+                    <div className="chapter-badge">
+                        <div className="stage-name">{chapterInfo.stage}</div>
+                        <div className="stage-copy">{chapterInfo.copy}</div>
+                        <div className="chapter-subline">{chapterInfo.aside}</div>
+                    </div>
+
+                    <div
+                        className={`favorites-panel ${(favoritesOpen || favoritesPinned) ? 'expanded' : 'collapsed'}`}
+                        onMouseEnter={() => setFavoritesOpen(true)}
+                        onMouseLeave={() => !favoritesPinned && setFavoritesOpen(false)}
+                    >
+                        <div className="favorites-head">
+                            <div className="favorites-head-main" onClick={() => setFavoritesOpen(prev => !prev)}>
+                                <div className="favorites-title">FAVORITES</div>
+                            </div>
+                            <button
+                                className={`panel-icon-btn ${favoritesPinned ? 'active' : ''}`}
+                                onClick={() => {
+                                    setFavoritesPinned(prev => !prev);
+                                    setFavoritesOpen(true);
+                                }}
+                                title="锁定收藏夹"
+                            >
+                                钉
+                            </button>
+                        </div>
+                        <div className="favorites-body">
+                            {favorites.length ? favorites.map((t, idx) => (
+                              <div className="favorite-item" key={idx} onClick={() => jumpToFavorite(t)}>{t}</div>
+                            )) : <div className="favorite-empty">把你喜欢的句子收藏在这里。</div>}
+                            {!!favorites.length && (
+                                <div className="favorites-actions">
+                                    <button className="music-mini-btn" onClick={() => setFavorites([])}>清空收藏</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 模态框 */}
+                    <QuoteDirectoryModal
+                        isOpen={isDirectoryOpen}
+                        comments={comments}
+                        onClose={() => setIsDirectoryOpen(false)}
+                        onSave={(nextComments) => {
+                            setComments(nextComments);
+                            setIsDirectoryOpen(false);
+                        }}
+                    />
+                    <AddNoteModal 
+                        isOpen={isModalOpen} 
+                        onClose={() => setIsModalOpen(false)} 
+                        onSubmit={handleAddCustomNote} 
+                    />
+                </div>
+            );
+        };
+
+        // --- 组件：添加便签的模态框 ---
+        const AddNoteModal = ({ isOpen, onClose, onSubmit }) => {
+            const [text, setText] = React.useState('');
+            const [theme, setTheme] = React.useState(THEMES[0]);
+            const [fontClass, setFontClass] = React.useState(FONT_PRESETS[0]);
+
+            const handleSubmit = () => {
+                if (text.trim()) {
+                    onSubmit(text, theme, fontClass);
+                    setText('');
+                    onClose();
+                }
+            };
+
+            const themeLabels = {
+                'theme-glass': '雾面玻璃',
+                'theme-abyss': '灰蓝深潭',
+                'theme-crimson': '旧玫瑰',
+                'theme-holo': '柔雾幻彩',
+                'theme-paper': '泛黄信笺',
+                'theme-neon': '苔绿打字机',
+                'theme-blush': '晚樱粉雾',
+                'theme-lavender': '薰衣草夜',
+                'theme-pearl': '珍珠奶白',
+                'theme-sunset': '杏桃晚霞'
+            };
+
+            const fontLabels = {
+                'font-serif': '温柔衬线',
+                'font-kaiti': '轻柔楷体',
+                'font-fangsong': '书页仿宋',
+                'font-sans': '清透黑体',
+                'font-rounded': '圆润手札'
+            };
+
+            return (
+                <div className={`modal-overlay ${isOpen ? 'open' : ''}`} onClick={(e) => { if(e.target === e.currentTarget) onClose(); }}>
+                    <div className="modal-content">
+                        <h3>投递你的意识碎片</h3>
+                        <div className="modal-subtitle">挑一个更贴近这句心事的颜色和字感，让它落下时像一张真正写给青春的便签。</div>
+                        <textarea 
+                            value={text} 
+                            onChange={e => setText(e.target.value)} 
+                            placeholder="写下你未曾说出口的话..."
+                        />
+                        <div className="picker-group">
+                            <div className="picker-label">便签色调</div>
+                            <div className="style-selector">
+                                {THEMES.map(t => (
+                                    <button 
+                                        key={t}
+                                        className={`style-btn theme-preview ${theme === t ? 'selected' : ''}`}
+                                        onClick={() => setTheme(t)}
+                                    >
+                                        {themeLabels[t]}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="picker-group">
+                            <div className="picker-label">字体气质</div>
+                            <div className="style-selector">
+                                {FONT_PRESETS.map(font => (
+                                    <button 
+                                        key={font}
+                                        className={`style-btn font-preview ${font} ${fontClass === font ? 'selected' : ''}`}
+                                        onClick={() => setFontClass(font)}
+                                    >
+                                        {fontLabels[font]}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="modal-actions">
+                            <button className="action-btn btn-cancel" onClick={onClose}>取消</button>
+                            <button className="action-btn btn-confirm" onClick={handleSubmit}>散落</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const QuoteDirectoryModal = ({ isOpen, comments, onClose, onSave }) => {
+            const [drafts, setDrafts] = React.useState(comments);
+            const [newQuote, setNewQuote] = React.useState('');
+
+            React.useEffect(() => {
+                if (isOpen) {
+                    setDrafts(comments);
+                    setNewQuote('');
+                }
+            }, [isOpen, comments]);
+
+            const updateDraft = (index, value) => {
+                setDrafts(prev => prev.map((item, idx) => idx === index ? value : item));
+            };
+
+            const deleteDraft = (index) => {
+                setDrafts(prev => prev.filter((_, idx) => idx !== index));
+            };
+
+            const addDraft = () => {
+                if (!newQuote.trim()) return;
+                setDrafts(prev => [...prev, newQuote.trim()]);
+                setNewQuote('');
+            };
+
+            const exportAsFile = (type) => {
+                const cleaned = drafts.map(item => item.trim()).filter(Boolean);
+                const content = type === 'json'
+                    ? JSON.stringify(cleaned, null, 2)
+                    : cleaned.join('\n');
+                const blob = new Blob([content], { type: type === 'json' ? 'application/json' : 'text/plain;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = type === 'json' ? 'romantic-quotes.json' : 'romantic-quotes.txt';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            };
+
+            const handleSave = () => {
+                onSave(drafts.map(item => item.trim()).filter(Boolean));
+            };
+
+            return (
+                <div className={`modal-overlay ${isOpen ? 'open' : ''}`} onClick={(e) => { if(e.target === e.currentTarget) onClose(); }}>
+                    <div className="modal-content directory-modal">
+                        <h3>语录目录</h3>
+                        <div className="modal-subtitle">这里保留所有正在使用的语录。你可以直接修改、删除、补充，并导出成文本或 JSON。</div>
+                        <div className="directory-toolbar">
+                            <div className="picker-label">当前共 {drafts.length} 句</div>
+                            <div className="directory-toolbar-actions">
+                                <button className="music-mini-btn" onClick={() => exportAsFile('txt')}>导出文本</button>
+                                <button className="music-mini-btn" onClick={() => exportAsFile('json')}>导出 JSON</button>
+                            </div>
+                        </div>
+                        <div className="quote-list">
+                            {drafts.map((quote, index) => (
+                                <div className="quote-row" key={`quote-${index}`}>
+                                    <div className="quote-row-head">
+                                        <div className="quote-index">QUOTE {String(index + 1).padStart(2, '0')}</div>
+                                    </div>
+                                    <textarea
+                                        value={quote}
+                                        onChange={(e) => updateDraft(index, e.target.value)}
+                                        placeholder="写下一句新的语录"
+                                    />
+                                    <div className="quote-row-actions">
+                                        <button className="music-mini-btn" onClick={() => deleteDraft(index)}>删除这句</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="new-quote-box">
+                            <div className="picker-label">新增语录</div>
+                            <textarea
+                                value={newQuote}
+                                onChange={(e) => setNewQuote(e.target.value)}
+                                placeholder="把新的句子加进目录..."
+                            />
+                            <div className="modal-actions">
+                                <button className="action-btn btn-cancel" onClick={onClose}>取消</button>
+                                <button className="music-mini-btn" onClick={addDraft}>先加入列表</button>
+                                <button className="action-btn btn-confirm" onClick={handleSave}>保存目录</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 渲染根节点
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

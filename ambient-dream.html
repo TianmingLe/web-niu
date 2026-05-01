@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ambient Dream · 梦境意识流重设计</title>
+  <style>
+    :root{
+      --font: "PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+      --ink: #f8fbff;
+      --muted: rgba(255,255,255,.6);
+      --accent-1: #8bd3ff;
+      --accent-2: #ff9ad6;
+      --accent-3: #9dffb0;
+      --accent-4: #b69bff;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;overflow:hidden}
+    body{
+      font-family:var(--font);
+      color:var(--ink);
+      background: radial-gradient(1200px 1200px at 70% 10%, #0c1030 0%, #080a25 50%, #05071a 100%);
+      user-select:none;
+    }
+    /* 背景分层：发光色块云 + 粒子 + 噪声薄雾 */
+    .stage{position:relative;width:100vw;height:100vh;overflow:hidden}
+    #layer-gradient,#layer-particles,#layer-noise{position:absolute;inset:0;pointer-events:none}
+    .blob{
+      position:absolute;width:60vmax;height:60vmax;border-radius:50%;
+      filter:blur(80px);
+      mix-blend-mode:screen;opacity:.35;
+      animation: float 28s ease-in-out infinite alternate;
+    }
+    .blob.b1{background: radial-gradient(circle at 30% 30%, var(--accent-1), transparent 60%);left:-10vmax;top:-10vmax;animation-duration:30s}
+    .blob.b2{background: radial-gradient(circle at 70% 40%, var(--accent-2), transparent 55%);right:-15vmax;top:0;animation-duration:34s}
+    .blob.b3{background: radial-gradient(circle at 40% 70%, var(--accent-3), transparent 60%);left:10vmax;bottom:-20vmax;animation-duration:32s}
+    .blob.b4{background: radial-gradient(circle at 60% 60%, var(--accent-4), transparent 55%);right:-5vmax;bottom:-10vmax;animation-duration:36s}
+    @keyframes float{
+      0%{transform:translate3d(0,0,0) scale(1)}
+      100%{transform:translate3d(4vmax,-3vmax,0) scale(1.15)}
+    }
+    /* 轻微色相漂移，增强“活体”感 */
+    .hue-rot{animation:hue 18s linear infinite}
+    @keyframes hue{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}
+    /* 活跃句子（中心显示） */
+    #active-box{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+      max-width:min(1000px,80vw);text-align:center;z-index:30;pointer-events:none;
+      padding:0 2rem;
+    }
+    #active-text{
+      font-size: clamp(22px, 4.2vw, 44px);
+      line-height:1.6; letter-spacing:.02em; opacity:0; transform:translateY(18px);
+      filter: drop-shadow(0 0 14px rgba(255,255,255,.15));
+      transition: opacity 1.6s ease, transform 1.6s ease, filter .6s ease;
+      text-shadow:
+        0 0 24px rgba(255,255,255,.25),
+        0 0 60px rgba(139,211,255,.18),
+        0 0 90px rgba(255,154,214,.12);
+    }
+    #active-text.visible{opacity:1; transform:translateY(0)}
+    #active-text.fading{opacity:0; transform:translateY(-16px)}
+    #hint{position:absolute;left:50%;bottom:5%;transform:translateX(-50%);
+      font-size:12px;color:var(--muted);letter-spacing:.2em;text-transform:uppercase;
+      z-index:20;animation:pulse 2.4s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:.35}50%{opacity:.9}}
+    /* 便签散落层 */
+    #notes{position:absolute;inset:0;z-index:15;pointer-events:auto}
+    .note{
+      position:absolute;padding:16px 18px;border-radius:14px;max-width:320px;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border:1px solid rgba(255,255,255,.22);
+      box-shadow: 0 10px 40px rgba(0,0,0,.35), inset 0 0 60px rgba(255,255,255,.05);
+      color:#f3f7ff; font-size:15px; line-height:1.6; transform:translateZ(0) rotate(var(--rot,0deg));
+      transition: opacity 2.4s ease, transform .25s cubic-bezier(.2,.9,.35,1.4), box-shadow .25s;
+      cursor: grab; opacity:.95;
+    }
+    .note:hover, .note.dragging{
+      opacity:1!important; transform: scale(1.06) rotate(var(--rot,0deg));
+      box-shadow: 0 16px 60px rgba(0,0,0,.55), 0 0 20px rgba(139,211,255,.35), inset 0 0 80px rgba(255,255,255,.08);
+      border-color: rgba(255,255,255,.45);
+      z-index:999 !important;
+    }
+    /* 便签样式族（含之前扩展的多样式） */
+    .style-glass{background: rgba(255,255,255,.10)}
+    .style-dark{background: rgba(0,0,0,.40); color:#e7e7ea}
+    .style-pink{background: rgba(255,182,193,.16); border-color: rgba(255,182,193,.4)}
+    .style-blue{background: rgba(173,216,230,.15); border-color: rgba(173,216,230,.35)}
+    .style-gold{background: rgba(255,215,0,.16);  border-color: rgba(255,215,0,.35)}
+    .style-neon{background: rgba(20,0,40,.4); color:#0ff; border:1px solid #0ff; box-shadow: 0 0 10px #0ff, inset 0 0 10px #0ff}
+    .style-paper{background: rgba(244,238,224,.85); color:#3e2723; border-color: rgba(200,180,150,.5)}
+    .style-mint{background: rgba(152,255,152,.16); color:#eaffea}
+    .style-purple{background: rgba(216,191,216,.15); color:#f8f4ff}
+    .style-holographic{background: linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,105,180,.15), rgba(135,206,235,.15))}
+    .style-typewriter{background: rgba(0,0,0,.6); color:#0f0; border:1px dashed #0f0; font-family:"Courier New",monospace}
+    .style-crimson{background: rgba(220,20,60,.18); color:#ffe6e6}
+    .style-minimal{background: transparent; color:#fff; border:2px solid rgba(255,255,255,.6); border-radius:0}
+    /* 角落添加按钮与输入模态 */
+    #add{position:absolute;right:24px;bottom:24px;z-index:25;width:52px;height:52px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;cursor:pointer;
+      border:1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.15); backdrop-filter: blur(6px);
+      transition:transform .2s, background .2s}
+    #add:hover{transform:scale(1.08); background: rgba(255,255,255,.25)}
+    #overlay{position:absolute;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
+      background:rgba(0,0,0,.55); backdrop-filter: blur(6px)}
+    #overlay.active{display:flex}
+    #modal{width:min(92vw,480px); background:rgba(25,28,60,.8); border:1px solid rgba(255,255,255,.18);
+      border-radius:16px; padding:22px 22px 16px}
+    #modal h3{font-size:16px; text-align:center; margin-bottom:14px; color:#eaf3ff}
+    textarea,select{width:100%;border-radius:10px;border:1px solid rgba(255,255,255,.25);color:#fff;outline:none}
+    textarea{height:110px;background:rgba(255,255,255,.09);padding:12px;margin:6px 0 10px}
+    select{background:rgba(255,255,255,.09);padding:10px}
+    .row{display:flex;gap:10px;margin-top:10px}
+    .row button{flex:1;border:none;border-radius:10px;padding:10px;font-weight:600;cursor:pointer}
+    .cancel{background:rgba(255,255,255,.18);color:#fff}
+    .ok{background:rgba(120,160,255,.9);color:#fff}
+    /* 粒子画布视觉淡化（像海水漂浮的发光尘埃） */
+    #layer-particles canvas{position:absolute;inset:0;filter: blur(0.6px) contrast(110%) brightness(115%); mix-blend-mode:screen; opacity:.65}
+    /* 噪声层很淡，只做气氛 */
+    #layer-noise canvas{position:absolute;inset:0;opacity:.06;mix-blend-mode:overlay}
+  </style>
+  <!-- 声明：本页面拦截滚动，使用滚轮/触控仅用于节奏控制 -->
+</head>
+<body>
+  <div class="stage" id="stage">
+    <div id="layer-gradient" class="hue-rot">
+      <div class="blob b1"></div>
+      <div class="blob b2"></div>
+      <div class="blob b3"></div>
+      <div class="blob b4"></div>
+    </div>
+    <div id="layer-particles"><canvas id="particles"></canvas></div>
+    <div id="layer-noise"><canvas id="noise"></canvas></div>
+
+    <div id="notes"></div>
+
+    <div id="active-box">
+      <div id="active-text"></div>
+    </div>
+    <div id="hint">SCROLL TO REVEAL · 用滚轮/上滑推进</div>
+    <div id="add">+</div>
+
+    <div id="overlay">
+      <div id="modal">
+        <h3>留下你的便签</h3>
+        <textarea id="noteInput" placeholder="写下你的故事..."></textarea>
+        <select id="noteStyle">
+          <option value="style-glass">透明清澈 (Glass)</option>
+          <option value="style-dark">深邃暗夜 (Dark)</option>
+          <option value="style-pink">晚霞粉红 (Pink)</option>
+          <option value="style-blue">忧郁深蓝 (Blue)</option>
+          <option value="style-gold">记忆流金 (Gold)</option>
+          <option value="style-neon">赛博霓虹 (Neon)</option>
+          <option value="style-paper">泛黄信笺 (Paper)</option>
+          <option value="style-mint">薄荷微风 (Mint)</option>
+          <option value="style-purple">薰衣草紫 (Purple)</option>
+          <option value="style-holographic">幻彩全息 (Holographic)</option>
+          <option value="style-typewriter">复古打字机 (Typewriter)</option>
+          <option value="style-crimson">猩红记忆 (Crimson)</option>
+          <option value="style-minimal">极简线条 (Minimal)</option>
+        </select>
+        <div class="row">
+          <button class="cancel" id="btnCancel">取消</button>
+          <button class="ok" id="btnOk">随手丢落</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const activeEl = document.getElementById('active-text');
+    const notesLayer = document.getElementById('notes');
+    const addBtn = document.getElementById('add');
+    const overlay = document.getElementById('overlay');
+    const noteInput = document.getElementById('noteInput');
+    const noteStyle = document.getElementById('noteStyle');
+    const btnCancel = document.getElementById('btnCancel');
+    const btnOk = document.getElementById('btnOk');
+    const stage = document.getElementById('stage');
+
+    let comments = [];
+    let idx = 0;
+    let lock = false;
+    let wheelAcc = 0;
+    const WHEEL_THRESHOLD = 320;
+
+    const allStyles = [
+      'style-glass','style-dark','style-pink','style-blue','style-gold',
+      'style-neon','style-paper','style-mint','style-purple','style-holographic',
+      'style-typewriter','style-crimson','style-minimal'
+    ];
+
+    function showText(t){
+      activeEl.textContent = t;
+      activeEl.classList.add('visible');
+      lock = false;
+    }
+    function next(){
+      if(lock || !comments.length) return;
+      lock = true;
+      // 1) 丢落当前句子为便签
+      if(activeEl.textContent.trim()){
+        dropNote(activeEl.textContent.trim());
+      }
+      // 2) 中心文本淡出
+      activeEl.classList.remove('visible');
+      activeEl.classList.add('fading');
+      // 3) 稍等再替换下一句
+      setTimeout(()=>{
+        idx = (idx + 1) % comments.length;
+        activeEl.classList.remove('fading');
+        activeEl.textContent = comments[idx];
+        setTimeout(()=>activeEl.classList.add('visible'), 120);
+        setTimeout(()=>{ lock=false; wheelAcc=0; }, 1000);
+      }, 1500);
+    }
+
+    // 拦截滚轮与触控
+    window.addEventListener('wheel', (e)=>{
+      e.preventDefault();
+      if(lock) return;
+      if(e.deltaY > 0){
+        wheelAcc += e.deltaY;
+        if(wheelAcc > WHEEL_THRESHOLD) next();
+      }
+    }, {passive:false});
+    let tsY = 0;
+    window.addEventListener('touchstart', e=>{ tsY = e.touches[0].clientY }, {passive:false});
+    window.addEventListener('touchmove', e=>{
+      if(lock) return;
+      e.preventDefault();
+      const dy = tsY - e.touches[0].clientY;
+      if(dy > 60){ next(); tsY = e.touches[0].clientY; }
+    }, {passive:false});
+
+    // 便签丢落 + 漂移到边缘（离心）
+    const drifting = new Set(); // 存活便签
+    function dropNote(text){
+      const el = document.createElement('div');
+      el.className = 'note ' + allStyles[(Math.random()*allStyles.length)|0];
+      el.textContent = text;
+      const xPct = 15 + Math.random()*70;
+      const yPct = 12 + Math.random()*72;
+      const rot = (Math.random()-0.5)*28;
+      el.style.left = xPct + '%';
+      el.style.top  = yPct + '%';
+      el.style.setProperty('--rot', rot.toFixed(2) + 'deg');
+      el.style.opacity = '1';
+      el.style.zIndex = (10 + (Math.random()*40)|0).toString();
+      notesLayer.appendChild(el);
+      // 计算朝边缘的漂移向量（相对于屏幕中心）
+      const rect = stage.getBoundingClientRect();
+      const cx = rect.width/2, cy = rect.height/2;
+      const startX = xPct/100 * rect.width;
+      const startY = yPct/100 * rect.height;
+      let vx = (startX - cx), vy = (startY - cy);
+      const len = Math.hypot(vx,vy) || 1;
+      vx/=len; vy/=len;
+      // 速度很慢，呈离心漂移；添加轻微摆动
+      const speed = .08 + Math.random()*.08; // px/帧
+      const wobble = Math.random()*Math.PI*2;
+      drifting.add({el, x:startX, y:startY, vx, vy, speed, t:0, wobble});
+      // 逐步降低透明度（但不消失）
+      setTimeout(()=>{ el.style.opacity = '.28'; }, 120);
+      // 悬停恢复清晰并暂停漂移
+      el.addEventListener('mouseenter', ()=>{ el.dataset.pause='1'; el.style.opacity='1'; });
+      el.addEventListener('mouseleave', ()=>{ delete el.dataset.pause; el.style.opacity='.28'; });
+    }
+    // 拖拽：鼠标与触屏
+    let drag = {on:false, target:null, sx:0, sy:0, sl:0, st:0, lastZ:0};
+    function startDrag(e){
+      const t = e.target;
+      if(!t.classList.contains('note')) return;
+      drag.on = true; drag.target = t;
+      const isMouse = !('touches' in e);
+      drag.sx = isMouse ? e.clientX : e.touches[0].clientX;
+      drag.sy = isMouse ? e.clientY : e.touches[0].clientY;
+      const comp = getComputedStyle(t);
+      drag.sl = parseFloat(comp.left)||0; drag.st = parseFloat(comp.top)||0;
+      t.classList.add('dragging'); drag.lastZ = t.style.zIndex; t.style.zIndex = '999';
+      t.dataset.pause = '1';
+    }
+    function moveDrag(e){
+      if(!drag.on) return;
+      const isMouse = !('touches' in e);
+      const cx = isMouse ? e.clientX : e.touches[0].clientX;
+      const cy = isMouse ? e.clientY : e.touches[0].clientY;
+      const dx = cx - drag.sx, dy = cy - drag.sy;
+      drag.target.style.left = (drag.sl + dx) + 'px';
+      drag.target.style.top  = (drag.st + dy) + 'px';
+      if(!isMouse) e.preventDefault();
+    }
+    function endDrag(){
+      if(!drag.on) return;
+      drag.target.classList.remove('dragging');
+      drag.target.style.zIndex = String(Math.max(50, Number(drag.lastZ)||50));
+      delete drag.target.dataset.pause;
+      drag = {on:false,target:null,sx:0,sy:0,sl:0,st:0,lastZ:0};
+    }
+    document.addEventListener('mousedown', startDrag);
+    document.addEventListener('mousemove', moveDrag);
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchstart', startDrag, {passive:false});
+    document.addEventListener('touchmove', moveDrag, {passive:false});
+    document.addEventListener('touchend', endDrag);
+
+    // 粒子层：海中发光尘埃
+    const pCanvas = document.getElementById('particles');
+    const pCtx = pCanvas.getContext('2d');
+    const particles = [];
+    function resize(){
+      pCanvas.width = stage.clientWidth; pCanvas.height = stage.clientHeight;
+      nCanvas.width = stage.clientWidth; nCanvas.height = stage.clientHeight;
+    }
+    window.addEventListener('resize', resize);
+    // 初始化一些粒子
+    function initParticles(n=220){
+      particles.length = 0;
+      for(let i=0;i<n;i++){
+        particles.push({
+          x: Math.random()*pCanvas.width,
+          y: Math.random()*pCanvas.height,
+          r: Math.random()*1.8 + .4,
+          a: Math.random()*Math.PI*2,
+          s: Math.random()*.4 + .05,
+          h: (Math.random()*360)|0
+        });
+      }
+    }
+    // 噪声层：超淡随机纹理
+    const nCanvas = document.getElementById('noise');
+    const nCtx = nCanvas.getContext('2d');
+    function drawNoise(){
+      const w = nCanvas.width, h = nCanvas.height;
+      const img = nCtx.createImageData(w, h);
+      for(let i=0;i<img.data.length;i+=4){
+        const v = 128 + (Math.random()*40 - 20); // 轻微抖动
+        img.data[i]=img.data[i+1]=img.data[i+2]=v; img.data[i+3]=255;
+      }
+      nCtx.putImageData(img,0,0);
+    }
+    // 漂移系统与粒子渲染
+    function tick(t){
+      // 漂移
+      for(const it of [...drifting]){
+        const el = it.el;
+        if(el.dataset.pause) continue;
+        it.t += 0.008;
+        const wob = Math.sin(it.t*2 + it.wobble) * 0.6;
+        it.x += (it.vx * it.speed) + wob;
+        it.y += (it.vy * it.speed) + Math.cos(it.t*2 + it.wobble)*0.4;
+        el.style.left = it.x + 'px';
+        el.style.top  = it.y + 'px';
+      }
+      // 粒子
+      pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
+      for(const p of particles){
+        p.a += 0.002 + p.s*0.002;
+        const flow = Math.sin(p.y*0.002 + t*0.0006) * 0.6;
+        p.x += Math.cos(p.a + flow) * (0.2 + p.s);
+        p.y += Math.sin(p.a*0.9) * (0.15 + p.s*0.6);
+        if(p.x<-10) p.x = pCanvas.width+10; if(p.x>pCanvas.width+10) p.x=-10;
+        if(p.y<-10) p.y = pCanvas.height+10; if(p.y>pCanvas.height+10) p.y=-10;
+        const g = pCtx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*4);
+        g.addColorStop(0, `hsla(${p.h}, 90%, 80%, .9)`);
+        g.addColorStop(1, `hsla(${p.h}, 90%, 60%, 0)`);
+        pCtx.fillStyle = g;
+        pCtx.beginPath(); pCtx.arc(p.x,p.y,p.r*4,0,Math.PI*2); pCtx.fill();
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // 角落添加按钮
+    addBtn.addEventListener('click', ()=>{ overlay.classList.add('active'); noteInput.value=''; noteInput.focus(); });
+    btnCancel.addEventListener('click', ()=>overlay.classList.remove('active'));
+    btnOk.addEventListener('click', ()=>{
+      const text = noteInput.value.trim();
+      if(text){
+        const el = document.createElement('div');
+        el.className = 'note ' + noteStyle.value;
+        el.textContent = text;
+        const rect = stage.getBoundingClientRect();
+        const x = 0.15*rect.width + Math.random()*0.7*rect.width;
+        const y = 0.12*rect.height + Math.random()*0.72*rect.height;
+        const rot = (Math.random()-0.5)*28;
+        el.style.left = x+'px'; el.style.top = y+'px'; el.style.setProperty('--rot', rot.toFixed(2)+'deg');
+        el.style.opacity = '1'; el.style.zIndex = '80';
+        notesLayer.appendChild(el);
+        // 加入漂移
+        const cx = rect.width/2, cy = rect.height/2;
+        let vx = (x - cx), vy = (y - cy); const len = Math.hypot(vx,vy)||1; vx/=len; vy/=len;
+        drifting.add({el, x, y, vx, vy, speed: .09 + Math.random()*.09, t:0, wobble: Math.random()*Math.PI*2});
+        setTimeout(()=>{ el.style.opacity='.32'; }, 1400);
+        overlay.classList.remove('active');
+      }
+    });
+    overlay.addEventListener('click', e=>{ if(e.target===overlay) overlay.classList.remove('active') });
+
+    // 视差（轻微）随鼠标移动
+    stage.addEventListener('mousemove', (e)=>{
+      const r = stage.getBoundingClientRect();
+      const nx = (e.clientX - r.width/2)/r.width;
+      const ny = (e.clientY - r.height/2)/r.height;
+      document.getElementById('layer-gradient').style.transform = `translate(${nx*10}px, ${ny*8}px)`;
+      document.getElementById('layer-particles').style.transform = `translate(${nx*14}px, ${ny*12}px)`;
+    });
+
+    // 启动
+    async function boot(){
+      try{
+        const res = await fetch('comments.json');
+        const data = await res.json();
+        comments = Array.isArray(data) && data.length ? data : [
+          "黑板上的粉笔灰落在阳光里，像一场无声的雪。",
+          "大海是鱼儿的陆地，梦境是爱情的白天。",
+          "那些没说出口的喜欢，都化作了迟迟不肯落下的晚霞。"
+        ];
+      }catch{
+        comments = [
+          "黑板上的粉笔灰落在阳光里，像一场无声的雪。",
+          "大海是鱼儿的陆地，梦境是爱情的白天。",
+          "那些没说出口的喜欢，都化作了迟迟不肯落下的晚霞。"
+        ];
+      }
+      showText(comments[0] || "");
+      resize(); initParticles(); drawNoise(); requestAnimationFrame(tick);
+    }
+    boot();
+  </script>
+</body>
+<!-- 设计流派：沉浸式梦境（Ambient Dream）· 多层发光云/粒子/薄雾 + 便签离心漂移 + 非滚动翻页节奏 -->
+</html>
+
