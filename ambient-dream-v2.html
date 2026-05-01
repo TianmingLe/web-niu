@@ -147,15 +147,41 @@
             /* 初始状态由GSAP控制 */
         }
 
-        .note-tag {
-            align-self: flex-start;
+        .note-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .note-tag-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
             padding: 4px 10px;
             border-radius: 999px;
             border: 1px solid rgba(255, 255, 255, 0.14);
             background: rgba(10, 10, 14, 0.35);
             color: var(--muted-text);
             font-size: 11px;
-            letter-spacing: 0.12em;
+            letter-spacing: 0.08em;
+        }
+
+        .mode-reading .note-tag-pill {
+            opacity: 0.66;
+        }
+
+        .tag-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex: 0 0 auto;
+        }
+
+        .tag-name {
+            max-width: 160px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .note-body {
@@ -311,6 +337,26 @@
             color: var(--muted-text);
             letter-spacing: 0.1em;
             white-space: nowrap;
+        }
+
+        .arrange-groups-wrap,
+        .arrange-filter-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            flex-wrap: wrap;
+        }
+
+        .arrange-group-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .soft-icon-btn {
@@ -1278,6 +1324,12 @@
                 width: 100%;
             }
 
+            .arrange-groups-wrap,
+            .arrange-filter-wrap {
+                grid-column: 1 / -1;
+                width: 100%;
+            }
+
             .arrange-search-input {
                 width: 100%;
             }
@@ -1409,6 +1461,7 @@
 
         const THEMES = ['theme-glass', 'theme-abyss', 'theme-crimson', 'theme-holo', 'theme-paper', 'theme-neon', 'theme-blush', 'theme-lavender', 'theme-pearl', 'theme-sunset'];
         const FONT_PRESETS = ['font-serif', 'font-kaiti', 'font-fangsong', 'font-sans', 'font-rounded'];
+        const TAG_COLORS = ['#a895b8', '#98aebb', '#8fa58f', '#7f809a', '#c8a7a7', '#b1c6b1', '#d0c3a8', '#9fb6c4'];
         const STORAGE_KEYS = {
             favorites: 'ambient-dream-favorites',
             tracks: 'ambient-dream-tracks',
@@ -1418,6 +1471,8 @@
             comments: 'ambient-dream-comments',
             notes: 'ambient-dream-notes',
             arrange: 'ambient-dream-arrange',
+            mode: 'ambient-dream-mode',
+            tagPalette: 'ambient-dream-tags-palette',
             directoryViewMode: 'ambient-dream-directory-view-mode',
             appBackupVersion: 'ambient-dream-backup-version'
         };
@@ -1476,6 +1531,15 @@
             return `${mm}:${ss}`;
         };
 
+        const normalizeTagName = (name) => String(name || '').trim();
+
+        const pickTagColor = (name) => {
+            const text = String(name || '');
+            let h = 0;
+            for (let i = 0; i < text.length; i++) h = (h + text.charCodeAt(i) * (i + 1)) % 997;
+            return TAG_COLORS[h % TAG_COLORS.length];
+        };
+
         // --- 组件：流体背景 ---
         const AmbientBackground = ({ bgRef }) => {
             const containerRef = React.useRef(null);
@@ -1511,7 +1575,7 @@
         };
 
         // --- 组件：独立的便签 ---
-        const MemoryNote = ({ id, text, theme, fontClass, tag, initialPos, isFocused, onFocus, onMoveEnd }) => {
+        const MemoryNote = ({ id, text, theme, fontClass, tags, initialPos, isFocused, onFocus, onMoveEnd }) => {
             const noteRef = React.useRef(null);
             const hasEnteredRef = React.useRef(false);
             const longPressTimerRef = React.useRef(null);
@@ -1694,8 +1758,15 @@
 
             return (
                 <div ref={noteRef} className={`memory-note ${theme} ${fontClass || 'font-serif'} ${isFocused ? 'focused' : ''}`} title="双击或长按置顶这一句">
-                    {!!String(tag || '').trim() && (
-                        <div className="note-tag">{String(tag).trim()}</div>
+                    {!!tags?.length && (
+                        <div className="note-tags">
+                            {tags.map((t) => (
+                                <div key={`${id}-${t.name}`} className="note-tag-pill">
+                                    <span className="tag-dot" style={{ backgroundColor: t.color || TAG_COLORS[0] }}></span>
+                                    <span className="tag-name">{t.name}</span>
+                                </div>
+                            ))}
+                        </div>
                     )}
                     <div className="note-body">{text}</div>
                 </div>
@@ -1711,15 +1782,32 @@
             const [isAnimating, setIsAnimating] = React.useState(false);
             const [isModalOpen, setIsModalOpen] = React.useState(false);
             const [isDirectoryOpen, setIsDirectoryOpen] = React.useState(false);
+            const [isTagEditorOpen, setIsTagEditorOpen] = React.useState(false);
+            const [mode, setMode] = React.useState(() => {
+                const stored = safeReadStorage(STORAGE_KEYS.mode, 'reading');
+                return stored === 'editing' ? 'editing' : 'reading';
+            });
             const [directoryViewMode, setDirectoryViewMode] = React.useState(() => {
                 const mode = safeReadStorage(STORAGE_KEYS.directoryViewMode, 'compact');
                 return mode === 'detail' ? 'detail' : 'compact';
             });
             const initialArrangeState = React.useMemo(() => safeReadStorage(STORAGE_KEYS.arrange, null), []);
             const [arrangeMode, setArrangeMode] = React.useState(() => !!initialArrangeState?.mode);
-            const [arrangePageIndex, setArrangePageIndex] = React.useState(() => Number.isFinite(initialArrangeState?.pageIndex) ? initialArrangeState.pageIndex : 0);
+            const [arrangeGroupKey, setArrangeGroupKey] = React.useState(() => typeof initialArrangeState?.groupKey === 'string' ? initialArrangeState.groupKey : null);
+            const [arrangeGroupPageIndex, setArrangeGroupPageIndex] = React.useState(() => {
+                if (Number.isFinite(initialArrangeState?.groupPageIndex)) return initialArrangeState.groupPageIndex;
+                if (Number.isFinite(initialArrangeState?.pageIndex)) return initialArrangeState.pageIndex;
+                return 0;
+            });
             const [arrangeSearch, setArrangeSearch] = React.useState('');
             const [arrangeMatchCursor, setArrangeMatchCursor] = React.useState(0);
+            const [groupingEnabled, setGroupingEnabled] = React.useState(() => initialArrangeState?.groupingEnabled !== false);
+            const [selectedTags, setSelectedTags] = React.useState(() => Array.isArray(initialArrangeState?.selectedTags) ? initialArrangeState.selectedTags : []);
+            const [includeUntagged, setIncludeUntagged] = React.useState(() => initialArrangeState?.includeUntagged !== false);
+            const [tagPalette, setTagPalette] = React.useState(() => {
+                const stored = safeReadStorage(STORAGE_KEYS.tagPalette, []);
+                return Array.isArray(stored) ? stored : [];
+            });
             const [tracks, setTracks] = React.useState(() => safeReadStorage(STORAGE_KEYS.tracks, []));
             const [currentTrackIndex, setCurrentTrackIndex] = React.useState(() => safeReadStorage(STORAGE_KEYS.currentTrackIndex, -1));
             const [isPlaying, setIsPlaying] = React.useState(false);
@@ -1768,7 +1856,7 @@
                 const ok = safeWriteStorage(key, value);
                 if (!ok) pushToast('存储失败：可能空间不足或被浏览器限制');
                 return ok;
-            }, [pushToast, pushHistory]);
+            }, [pushToast]);
 
             const arrangeMetrics = React.useMemo(() => {
                 const width = viewportProfile.width;
@@ -1785,15 +1873,118 @@
                 return { cols, cardWidth, cardHeight, gapX, gapY, topOffset, pageSize };
             }, [viewportProfile]);
 
+            const noteById = React.useMemo(() => {
+                const map = new Map();
+                (Array.isArray(droppedNotes) ? droppedNotes : []).forEach(note => {
+                    if (!note || note.id == null) return;
+                    map.set(note.id, note);
+                });
+                return map;
+            }, [droppedNotes]);
+
+            const selectedTagSet = React.useMemo(() => {
+                return new Set((Array.isArray(selectedTags) ? selectedTags : []).map(t => String(t || '').trim().toLowerCase()).filter(Boolean));
+            }, [selectedTags]);
+
+            const filteredNotes = React.useMemo(() => {
+                const source = Array.isArray(droppedNotes) ? droppedNotes : [];
+                if (!selectedTagSet.size) {
+                    if (!includeUntagged) return source.filter(note => Array.isArray(note?.tags) && note.tags.length);
+                    return source;
+                }
+                return source.filter(note => {
+                    const tags = Array.isArray(note?.tags) ? note.tags : [];
+                    if (!tags.length) return includeUntagged;
+                    return tags.some(t => selectedTagSet.has(String(t?.name || '').trim().toLowerCase()));
+                });
+            }, [droppedNotes, includeUntagged, selectedTagSet]);
+
+            const arrangeGroups = React.useMemo(() => {
+                if (!groupingEnabled) {
+                    return [
+                        {
+                            key: null,
+                            label: '全部',
+                            color: null,
+                            noteIds: filteredNotes.map(n => n.id)
+                        }
+                    ];
+                }
+
+                const map = new Map();
+                filteredNotes.forEach(note => {
+                    const tags = Array.isArray(note?.tags) ? note.tags : [];
+                    if (!tags.length) {
+                        const key = '__untagged__';
+                        if (!map.has(key)) map.set(key, { key, label: '未分类', color: null, noteIds: [] });
+                        map.get(key).noteIds.push(note.id);
+                        return;
+                    }
+                    tags.forEach(t => {
+                        const name = String(t?.name || '').trim();
+                        if (!name) return;
+                        const key = name.toLowerCase();
+                        const color = t?.color || tagPalette.find(p => String(p?.name || '').toLowerCase() === key)?.color || pickTagColor(name);
+                        if (!map.has(key)) map.set(key, { key, label: name, color, noteIds: [] });
+                        map.get(key).noteIds.push(note.id);
+                    });
+                });
+
+                const paletteOrder = (Array.isArray(tagPalette) ? tagPalette : []).slice().sort((a, b) => (b?.updatedAt || 0) - (a?.updatedAt || 0));
+                const getRank = (key) => {
+                    if (key === '__untagged__') return 999999;
+                    const idx = paletteOrder.findIndex(p => String(p?.name || '').toLowerCase() === key);
+                    return idx === -1 ? 9999 : idx;
+                };
+
+                return Array.from(map.values()).sort((a, b) => {
+                    const ra = getRank(a.key);
+                    const rb = getRank(b.key);
+                    if (ra !== rb) return ra - rb;
+                    return String(a.label).localeCompare(String(b.label), 'zh-CN');
+                });
+            }, [filteredNotes, groupingEnabled, pickTagColor, tagPalette]);
+
+            const currentArrangeGroup = React.useMemo(() => {
+                if (!arrangeGroups.length) return null;
+                if (arrangeGroupKey == null) return arrangeGroups[0];
+                return arrangeGroups.find(g => g.key === arrangeGroupKey) || arrangeGroups[0];
+            }, [arrangeGroupKey, arrangeGroups]);
+
+            React.useEffect(() => {
+                if (!arrangeMode) return;
+                if (!groupingEnabled) {
+                    if (arrangeGroupKey !== null) setArrangeGroupKey(null);
+                    return;
+                }
+                if (!arrangeGroups.length) return;
+                if (arrangeGroupKey == null || !arrangeGroups.some(g => g.key === arrangeGroupKey)) {
+                    setArrangeGroupKey(arrangeGroups[0].key);
+                    setArrangeGroupPageIndex(0);
+                }
+            }, [arrangeMode, arrangeGroupKey, arrangeGroups, groupingEnabled]);
+
             const totalLayers = React.useMemo(() => {
-                return Math.max(1, Math.ceil(droppedNotes.length / arrangeMetrics.pageSize));
-            }, [droppedNotes.length, arrangeMetrics.pageSize]);
+                const ids = currentArrangeGroup?.noteIds || [];
+                return Math.max(1, Math.ceil(ids.length / arrangeMetrics.pageSize));
+            }, [arrangeMetrics.pageSize, currentArrangeGroup]);
+
+            const arrangedNoteIds = React.useMemo(() => {
+                if (!arrangeMode) return [];
+                const ids = currentArrangeGroup?.noteIds || [];
+                const start = arrangeGroupPageIndex * arrangeMetrics.pageSize;
+                return ids.slice(start, start + arrangeMetrics.pageSize);
+            }, [arrangeMode, arrangeGroupPageIndex, arrangeMetrics.pageSize, currentArrangeGroup]);
+
+            const arrangedNotes = React.useMemo(() => {
+                return arrangedNoteIds.map(id => noteById.get(id)).filter(Boolean);
+            }, [arrangedNoteIds, noteById]);
 
             React.useEffect(() => {
                 if (!arrangeMode) return;
                 const max = Math.max(0, totalLayers - 1);
-                if (arrangePageIndex > max) setArrangePageIndex(max);
-            }, [arrangeMode, arrangePageIndex, totalLayers]);
+                if (arrangeGroupPageIndex > max) setArrangeGroupPageIndex(max);
+            }, [arrangeMode, arrangeGroupPageIndex, totalLayers]);
 
             const pushHistory = React.useCallback(() => {
                 if (historyLockRef.current) return;
@@ -1801,14 +1992,15 @@
                     droppedNotes,
                     favorites,
                     arrangeMode,
-                    arrangePageIndex,
+                    arrangeGroupKey,
+                    arrangeGroupPageIndex,
                     tracks,
                     currentTrackIndex,
                     orderMode,
                     volume
                 };
                 historyRef.current = [...historyRef.current, snapshot].slice(-30);
-            }, [arrangeMode, arrangePageIndex, currentTrackIndex, droppedNotes, favorites, orderMode, tracks, volume]);
+            }, [arrangeMode, arrangeGroupKey, arrangeGroupPageIndex, currentTrackIndex, droppedNotes, favorites, orderMode, tracks, volume]);
 
             const undo = React.useCallback(() => {
                 const snapshot = historyRef.current.pop();
@@ -1820,7 +2012,8 @@
                 setDroppedNotes(snapshot.droppedNotes || []);
                 setFavorites(snapshot.favorites || []);
                 setArrangeMode(!!snapshot.arrangeMode);
-                setArrangePageIndex(Number.isFinite(snapshot.arrangePageIndex) ? snapshot.arrangePageIndex : 0);
+                setArrangeGroupKey(typeof snapshot.arrangeGroupKey === 'string' ? snapshot.arrangeGroupKey : null);
+                setArrangeGroupPageIndex(Number.isFinite(snapshot.arrangeGroupPageIndex) ? snapshot.arrangeGroupPageIndex : 0);
                 setTracks(Array.isArray(snapshot.tracks) ? snapshot.tracks : []);
                 setCurrentTrackIndex(Number.isFinite(snapshot.currentTrackIndex) ? snapshot.currentTrackIndex : -1);
                 setOrderMode(snapshot.orderMode === 'sequential' || snapshot.orderMode === 'loop_one' || snapshot.orderMode === 'shuffle' ? snapshot.orderMode : 'sequential');
@@ -1835,13 +2028,13 @@
                 const q = String(arrangeSearch || '').trim().toLowerCase();
                 if (!q) return [];
                 const matches = [];
-                droppedNotes.forEach((note, index) => {
+                filteredNotes.forEach((note) => {
                     const text = String(note?.text || '').toLowerCase();
-                    const tag = String(note?.tag || '').toLowerCase();
-                    if (text.includes(q) || tag.includes(q)) matches.push({ id: note.id, index });
+                    const tagText = Array.isArray(note?.tags) ? note.tags.map(t => String(t?.name || '')).join(' ').toLowerCase() : '';
+                    if (text.includes(q) || tagText.includes(q)) matches.push({ id: note.id });
                 });
                 return matches;
-            }, [arrangeSearch, droppedNotes]);
+            }, [arrangeSearch, filteredNotes]);
 
             React.useEffect(() => {
                 setArrangeMatchCursor(0);
@@ -1854,12 +2047,29 @@
                 }
                 const nextCursor = ((cursor % arrangeMatches.length) + arrangeMatches.length) % arrangeMatches.length;
                 const hit = arrangeMatches[nextCursor];
-                const pageIndex = Math.floor(hit.index / arrangeMetrics.pageSize);
+                const hitId = hit.id;
+                const note = noteById.get(hitId);
+                let nextGroupKey = null;
+                if (groupingEnabled) {
+                    const tags = Array.isArray(note?.tags) ? note.tags : [];
+                    const candidates = tags.map(t => String(t?.name || '').trim()).filter(Boolean);
+                    const preferred = selectedTagSet.size ? candidates.find(name => selectedTagSet.has(name.toLowerCase())) : null;
+                    const picked = preferred || candidates[0];
+                    nextGroupKey = picked ? picked.toLowerCase() : '__untagged__';
+                    if (!arrangeGroups.some(g => g.key === nextGroupKey)) {
+                        nextGroupKey = arrangeGroups[0]?.key ?? '__untagged__';
+                    }
+                }
+                const group = arrangeGroups.find(g => (g.key ?? null) === (nextGroupKey ?? null)) || arrangeGroups[0];
+                const ids = group?.noteIds || [];
+                const pos = ids.indexOf(hitId);
+                const pageIndex = pos >= 0 ? Math.floor(pos / arrangeMetrics.pageSize) : 0;
                 setArrangeMode(true);
-                setArrangePageIndex(pageIndex);
-                setFocusedNoteId(hit.id);
+                setArrangeGroupKey(nextGroupKey);
+                setArrangeGroupPageIndex(pageIndex);
+                setFocusedNoteId(hitId);
                 setArrangeMatchCursor(nextCursor);
-            }, [arrangeMatches, arrangeMetrics.pageSize, pushToast]);
+            }, [arrangeGroups, arrangeMatches, arrangeMetrics.pageSize, groupingEnabled, noteById, pushToast, selectedTagSet]);
 
             const locatePrevMatch = React.useCallback(() => {
                 if (!arrangeMatches.length) {
@@ -1951,12 +2161,34 @@
             }, [droppedNotes]);
 
             React.useEffect(() => {
-                writeStorage(STORAGE_KEYS.arrange, { mode: arrangeMode, pageIndex: arrangePageIndex });
-            }, [arrangeMode, arrangePageIndex]);
+                writeStorage(STORAGE_KEYS.arrange, {
+                    mode: arrangeMode,
+                    groupKey: arrangeGroupKey,
+                    groupPageIndex: arrangeGroupPageIndex,
+                    groupingEnabled,
+                    selectedTags,
+                    includeUntagged
+                });
+            }, [arrangeMode, arrangeGroupKey, arrangeGroupPageIndex, groupingEnabled, includeUntagged, selectedTags]);
+
+            React.useEffect(() => {
+                writeStorage(STORAGE_KEYS.mode, mode);
+            }, [mode]);
+
+            React.useEffect(() => {
+                writeStorage(STORAGE_KEYS.tagPalette, tagPalette);
+            }, [tagPalette]);
 
             React.useEffect(() => {
                 writeStorage(STORAGE_KEYS.directoryViewMode, directoryViewMode);
             }, [directoryViewMode]);
+
+            React.useEffect(() => {
+                if (mode !== 'reading') return;
+                setArrangeMode(false);
+                setArrangeSearch('');
+                setFocusedNoteId(null);
+            }, [mode]);
 
             React.useEffect(() => {
                 const audio = audioRef.current;
@@ -2247,6 +2479,7 @@
                     text: currentText,
                     theme: THEMES[Math.floor(Math.random() * THEMES.length)],
                     fontClass: FONT_PRESETS[Math.floor(Math.random() * FONT_PRESETS.length)],
+                    tags: [],
                     pos: getRandomNotePos()
                 };
                 
@@ -2329,14 +2562,71 @@
                 };
             }, [isAnimating, isModalOpen, isDirectoryOpen, currentIndex, comments.length]);
 
+            const upsertPalette = React.useCallback((name, color) => {
+                const normalized = normalizeTagName(name);
+                if (!normalized) return;
+                const lower = normalized.toLowerCase();
+                setTagPalette(prev => {
+                    const now = Date.now();
+                    const existing = prev.find(t => String(t?.name || '').toLowerCase() === lower);
+                    if (existing) {
+                        return prev.map(t => String(t?.name || '').toLowerCase() === lower ? { ...t, color: color || t.color, updatedAt: now } : t);
+                    }
+                    const nextColor = color || pickTagColor(normalized);
+                    return [{ name: normalized, color: nextColor, updatedAt: now }, ...prev].slice(0, 60);
+                });
+            }, []);
+
+            const normalizeTags = React.useCallback((input) => {
+                if (!input) return [];
+                const arr = Array.isArray(input) ? input : [input];
+                const normalized = arr
+                    .map(item => typeof item === 'string' ? { name: item } : item)
+                    .map(item => ({ name: normalizeTagName(item?.name), color: item?.color }))
+                    .filter(item => item.name);
+                const seen = new Set();
+                const result = [];
+                normalized.forEach(item => {
+                    const key = item.name.toLowerCase();
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    const color = item.color || tagPalette.find(t => String(t?.name || '').toLowerCase() === key)?.color || pickTagColor(item.name);
+                    result.push({ name: item.name, color });
+                    upsertPalette(item.name, color);
+                });
+                return result;
+            }, [tagPalette, upsertPalette]);
+
+            const notesMigratedRef = React.useRef(false);
+            React.useEffect(() => {
+                if (notesMigratedRef.current) return;
+                notesMigratedRef.current = true;
+                let changed = false;
+                const next = (Array.isArray(droppedNotes) ? droppedNotes : []).map(note => {
+                    if (!note || typeof note !== 'object') return note;
+                    if (Array.isArray(note.tags)) {
+                        const nextTags = normalizeTags(note.tags);
+                        if (JSON.stringify(nextTags) !== JSON.stringify(note.tags)) changed = true;
+                        return { ...note, tags: nextTags };
+                    }
+                    const legacy = normalizeTagName(note.tag);
+                    if (!legacy) return { ...note, tags: [] };
+                    const legacyTags = normalizeTags([{ name: legacy }]);
+                    changed = true;
+                    const { tag, ...rest } = note;
+                    return { ...rest, tags: legacyTags };
+                });
+                if (changed) setDroppedNotes(next);
+            }, []);
+
             // 添加自定义便签
-            const handleAddCustomNote = (text, theme, fontClass, tag) => {
+            const handleAddCustomNote = (text, theme, fontClass, tags) => {
                 const newNote = {
                     id: Date.now() + Math.random(),
                     text: text,
                     theme: theme,
                     fontClass: fontClass || 'font-serif',
-                    tag: String(tag || '').trim(),
+                    tags: normalizeTags(tags),
                     pos: getRandomNotePos()
                 };
                 pushHistory();
@@ -2367,7 +2657,8 @@
                 const cardHeight = arrangeMetrics.cardHeight;
                 setFocusedNoteId(null);
                 setArrangeMode(true);
-                setArrangePageIndex(0);
+                setArrangeGroupKey(null);
+                setArrangeGroupPageIndex(0);
                 setDroppedNotes(prev => prev.map((note, index) => {
                     const localIndex = index % pageSize;
                     const col = localIndex % cols;
@@ -2387,6 +2678,16 @@
                 const onKeyDown = (e) => {
                     const tag = e.target?.tagName;
                     const isEditing = tag === 'TEXTAREA' || tag === 'INPUT';
+
+                    if (e.key === 'Tab' && !isEditing && !isModalOpen && !isDirectoryOpen) {
+                        e.preventDefault();
+                        setMode(prev => {
+                            const next = prev === 'reading' ? 'editing' : 'reading';
+                            pushToast(next === 'editing' ? '编辑模式' : '阅读模式');
+                            return next;
+                        });
+                        return;
+                    }
 
                     if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && !isEditing) {
                         e.preventDefault();
@@ -2415,7 +2716,38 @@
                 };
                 window.addEventListener('keydown', onKeyDown);
                 return () => window.removeEventListener('keydown', onKeyDown);
-            }, [arrangeMode, deleteFocusedNote, focusedNoteId, isDirectoryOpen, isModalOpen, undo]);
+            }, [arrangeMode, deleteFocusedNote, focusedNoteId, isDirectoryOpen, isModalOpen, pushToast, undo]);
+
+            React.useEffect(() => {
+                let timer = null;
+                const clear = () => {
+                    if (timer) {
+                        window.clearTimeout(timer);
+                        timer = null;
+                    }
+                };
+                const onPointerDown = (e) => {
+                    if (isModalOpen || isDirectoryOpen) return;
+                    if (e.target?.closest?.('.memory-note, .controls, .music-dock, .favorites-panel, .modal-overlay')) return;
+                    clear();
+                    timer = window.setTimeout(() => {
+                        setMode(prev => {
+                            const next = prev === 'reading' ? 'editing' : 'reading';
+                            pushToast(next === 'editing' ? '编辑模式' : '阅读模式');
+                            return next;
+                        });
+                    }, 600);
+                };
+                window.addEventListener('pointerdown', onPointerDown, { passive: true });
+                window.addEventListener('pointerup', clear, { passive: true });
+                window.addEventListener('pointercancel', clear, { passive: true });
+                return () => {
+                    window.removeEventListener('pointerdown', onPointerDown);
+                    window.removeEventListener('pointerup', clear);
+                    window.removeEventListener('pointercancel', clear);
+                    clear();
+                };
+            }, [isDirectoryOpen, isModalOpen, pushToast]);
 
             const handleMusicUpload = (event) => {
                 const files = Array.from(event.target.files || []).filter(file => file.type.startsWith('audio/'));
@@ -2598,11 +2930,13 @@
 
             const exportBackup = React.useCallback(() => {
                 const payload = {
-                    version: 1,
+                    version: 2,
                     exportedAt: new Date().toISOString(),
                     comments,
                     droppedNotes,
                     favorites,
+                    mode,
+                    tagPalette,
                     settings: {
                         volume,
                         orderMode,
@@ -2618,7 +2952,7 @@
                 a.download = `ambient-dream-backup-${Date.now()}.json`;
                 a.click();
                 URL.revokeObjectURL(a.href);
-            }, [comments, droppedNotes, favorites, volume, orderMode, currentTrackIndex, tracks]);
+            }, [comments, droppedNotes, favorites, mode, orderMode, currentTrackIndex, tagPalette, tracks, volume]);
 
             const importBackup = React.useCallback((payload) => {
                 if (!payload || typeof payload !== 'object') {
@@ -2640,12 +2974,24 @@
                         text: note.text,
                         theme: THEMES.includes(note.theme) ? note.theme : THEMES[0],
                         fontClass: FONT_PRESETS.includes(note.fontClass) ? note.fontClass : 'font-serif',
-                        tag: String(note.tag || '').trim(),
+                        tags: normalizeTags(note.tags || note.tag || []),
                         pos: { x: note.pos.x, y: note.pos.y, rot: Number.isFinite(note.pos.rot) ? note.pos.rot : 0 }
                     }));
                 setComments(nextComments.filter(Boolean));
                 setDroppedNotes(cleanedNotes);
                 setFavorites(nextFavorites || []);
+                if (payload.mode === 'reading' || payload.mode === 'editing') setMode(payload.mode);
+                if (Array.isArray(payload.tagPalette)) {
+                    const cleanedPalette = payload.tagPalette
+                        .filter(t => t && typeof t.name === 'string')
+                        .map(t => ({
+                            name: normalizeTagName(t.name),
+                            color: typeof t.color === 'string' ? t.color : pickTagColor(t.name),
+                            updatedAt: Number.isFinite(t.updatedAt) ? t.updatedAt : Date.now()
+                        }))
+                        .filter(t => t.name);
+                    setTagPalette(cleanedPalette.slice(0, 60));
+                }
                 if (payload.settings && typeof payload.settings === 'object') {
                     if (Number.isFinite(payload.settings.volume)) setVolume(Math.min(Math.max(payload.settings.volume, 0), 1));
                     if (payload.settings.orderMode === 'sequential' || payload.settings.orderMode === 'loop_one' || payload.settings.orderMode === 'shuffle') setOrderMode(payload.settings.orderMode);
@@ -2663,10 +3009,11 @@
                     setTracks(incomingTracks);
                 }
                 setArrangeMode(false);
-                setArrangePageIndex(0);
+                setArrangeGroupKey(null);
+                setArrangeGroupPageIndex(0);
                 setFocusedNoteId(null);
                 pushToast('备份已导入');
-            }, [pushToast]);
+            }, [normalizeTags, pushToast, pushHistory]);
 
             const chapterInfo = React.useMemo(() => {
                 const currentText = comments[currentIndex] || '';
@@ -2733,21 +3080,21 @@
                 setFocusedNoteId(prev => prev === noteId ? null : noteId);
             };
 
-            const pageSize = arrangeMetrics.pageSize;
-            const arrangeStart = arrangePageIndex * pageSize;
-            const visibleNotes = arrangeMode ? droppedNotes.slice(arrangeStart, arrangeStart + pageSize) : droppedNotes;
+            const visibleNotes = arrangeMode ? arrangedNotes : droppedNotes;
 
             const exitArrangeMode = () => {
                 setArrangeMode(false);
                 setArrangeSearch('');
+                setArrangeGroupKey(null);
+                setArrangeGroupPageIndex(0);
             };
 
             const prevArrangeLayer = () => {
-                setArrangePageIndex(prev => Math.max(0, prev - 1));
+                setArrangeGroupPageIndex(prev => Math.max(0, prev - 1));
             };
 
             const nextArrangeLayer = () => {
-                setArrangePageIndex(prev => Math.min(Math.max(0, totalLayers - 1), prev + 1));
+                setArrangeGroupPageIndex(prev => Math.min(Math.max(0, totalLayers - 1), prev + 1));
             };
 
             const handleNoteMoveEnd = React.useCallback((noteId, pos) => {
@@ -2756,7 +3103,7 @@
             }, [pushHistory]);
 
             return (
-                <div className={`main-stage viewport-${viewportProfile.mode}`}>
+                <div className={`main-stage viewport-${viewportProfile.mode} mode-${mode}`}>
                     <AmbientBackground bgRef={ambientBgRef} />
                     <div className="noise-overlay"></div>
                     
@@ -2769,7 +3116,7 @@
                                 text={note.text} 
                                 theme={note.theme} 
                                 fontClass={note.fontClass}
-                                tag={note.tag}
+                                tags={note.tags}
                                 initialPos={note.pos} 
                                 isFocused={focusedNoteId === note.id}
                                 onFocus={toggleNoteFocus}
@@ -2908,7 +3255,83 @@
                         <div className="soft-icon-btn label-btn" title="自动阅读" onClick={() => setIsAutoReading(prev => !prev)}>
                             {isAutoReading ? '停读' : '自读'}
                         </div>
-                        {arrangeMode && (
+                        {arrangeMode && mode === 'editing' && (
+                            <div className="arrange-groups-wrap">
+                                <button
+                                    type="button"
+                                    className={`music-mini-btn ${groupingEnabled ? 'active' : ''}`}
+                                    onClick={() => setGroupingEnabled(prev => !prev)}
+                                >
+                                    分组
+                                </button>
+                                {groupingEnabled && arrangeGroups.map(g => (
+                                    <button
+                                        key={g.key || 'all'}
+                                        type="button"
+                                        className={`music-mini-btn arrange-group-btn ${(currentArrangeGroup?.key ?? null) === (g.key ?? null) ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setArrangeGroupKey(g.key);
+                                            setArrangeGroupPageIndex(0);
+                                        }}
+                                    >
+                                        {!!g.color && <span className="tag-dot" style={{ backgroundColor: g.color }}></span>}
+                                        <span>{g.label}</span>
+                                        <span className="arrange-search-meta">{g.noteIds.length}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {arrangeMode && mode === 'editing' && (
+                            <div className="arrange-filter-wrap">
+                                {(tagPalette || []).slice(0, 10).map(t => {
+                                    const key = String(t?.name || '').trim().toLowerCase();
+                                    if (!key) return null;
+                                    const active = selectedTagSet.has(key);
+                                    return (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            className={`music-mini-btn arrange-group-btn ${active ? 'active' : ''}`}
+                                            onClick={() => {
+                                                setSelectedTags(prev => {
+                                                    const set = new Set((Array.isArray(prev) ? prev : []).map(x => String(x || '').trim().toLowerCase()).filter(Boolean));
+                                                    if (set.has(key)) set.delete(key);
+                                                    else set.add(key);
+                                                    return Array.from(set);
+                                                });
+                                                setArrangeGroupPageIndex(0);
+                                            }}
+                                        >
+                                            {!!t.color && <span className="tag-dot" style={{ backgroundColor: t.color }}></span>}
+                                            <span>{t.name}</span>
+                                        </button>
+                                    );
+                                })}
+                                <button
+                                    type="button"
+                                    className={`music-mini-btn ${includeUntagged ? 'active' : ''}`}
+                                    onClick={() => {
+                                        setIncludeUntagged(prev => !prev);
+                                        setArrangeGroupPageIndex(0);
+                                    }}
+                                >
+                                    未分类
+                                </button>
+                                <button
+                                    type="button"
+                                    className="music-mini-btn"
+                                    onClick={() => {
+                                        setSelectedTags([]);
+                                        setIncludeUntagged(true);
+                                        setArrangeSearch('');
+                                        setArrangeGroupPageIndex(0);
+                                    }}
+                                >
+                                    清空
+                                </button>
+                            </div>
+                        )}
+                        {arrangeMode && mode === 'editing' && (
                             <div className="arrange-search-wrap">
                                 <input
                                     className="arrange-search-input"
@@ -2931,24 +3354,35 @@
                                 </div>
                             </div>
                         )}
-                        {arrangeMode && (
+                        {arrangeMode && mode === 'editing' && (
                             <div className="soft-icon-btn label-btn" title="上一层" onClick={prevArrangeLayer}>上一层</div>
                         )}
-                        {arrangeMode && (
+                        {arrangeMode && mode === 'editing' && (
                             <div className="soft-icon-btn label-btn" title="下一层" onClick={nextArrangeLayer}>下一层</div>
                         )}
-                        {arrangeMode && (
-                            <div className="soft-icon-btn label-btn" title="当前层">{`层 ${arrangePageIndex + 1}/${totalLayers}`}</div>
+                        {arrangeMode && mode === 'editing' && (
+                            <div className="soft-icon-btn label-btn" title="当前层">{`${currentArrangeGroup?.label || '全部'} ${arrangeGroupPageIndex + 1}/${totalLayers}`}</div>
                         )}
-                        <div className="soft-icon-btn label-btn" title={arrangeMode ? "退出整理" : "整理便签"} onClick={arrangeMode ? exitArrangeMode : arrangeNotes}>
-                            {arrangeMode ? '退出整理' : '整理'}
-                        </div>
-                        <div className="soft-icon-btn label-btn" title="撤销" onClick={undo}>撤销</div>
-                        <div className="soft-icon-btn label-btn" title="清空便签" onClick={clearAllNotes}>清空</div>
-                        <div className="add-btn" onClick={() => {
-                            setIsDirectoryOpen(false);
-                            setIsModalOpen(true);
-                        }}>+</div>
+                        {mode === 'editing' && (
+                            <div className="soft-icon-btn label-btn" title={arrangeMode ? "退出整理" : "整理便签"} onClick={arrangeMode ? exitArrangeMode : arrangeNotes}>
+                                {arrangeMode ? '退出整理' : '整理'}
+                            </div>
+                        )}
+                        {mode === 'editing' && (
+                            <div className="soft-icon-btn label-btn" title="撤销" onClick={undo}>撤销</div>
+                        )}
+                        {mode === 'editing' && focusedNoteId != null && (
+                            <div className="soft-icon-btn label-btn" title="编辑标签" onClick={() => setIsTagEditorOpen(true)}>标签</div>
+                        )}
+                        {mode === 'editing' && (
+                            <div className="soft-icon-btn label-btn" title="清空便签" onClick={clearAllNotes}>清空</div>
+                        )}
+                        {mode === 'editing' && (
+                            <div className="add-btn" onClick={() => {
+                                setIsDirectoryOpen(false);
+                                setIsModalOpen(true);
+                            }}>+</div>
+                        )}
                     </div>
 
                     <div className="chapter-badge">
@@ -3012,31 +3446,81 @@
                             setIsDirectoryOpen(false);
                         }}
                     />
+                    <TagEditorModal
+                        isOpen={isTagEditorOpen}
+                        note={focusedNoteId != null ? noteById.get(focusedNoteId) : null}
+                        tagPalette={tagPalette}
+                        onClose={() => setIsTagEditorOpen(false)}
+                        onSave={(nextTags) => {
+                            if (focusedNoteId == null) return;
+                            pushHistory();
+                            setDroppedNotes(prev => prev.map(note => note.id === focusedNoteId ? { ...note, tags: normalizeTags(nextTags) } : note));
+                            setIsTagEditorOpen(false);
+                        }}
+                    />
                     <AddNoteModal 
                         isOpen={isModalOpen} 
                         onClose={() => setIsModalOpen(false)} 
-                        onSubmit={handleAddCustomNote} 
+                        onSubmit={handleAddCustomNote}
+                        tagPalette={tagPalette}
                     />
                 </div>
             );
         };
 
         // --- 组件：添加便签的模态框 ---
-        const AddNoteModal = ({ isOpen, onClose, onSubmit }) => {
+        const AddNoteModal = ({ isOpen, onClose, onSubmit, tagPalette }) => {
             const [text, setText] = React.useState('');
             const [theme, setTheme] = React.useState(THEMES[0]);
             const [fontClass, setFontClass] = React.useState(FONT_PRESETS[0]);
-            const [tag, setTag] = React.useState('');
+            const [tagInput, setTagInput] = React.useState('');
+            const [tags, setTags] = React.useState([]);
 
             React.useEffect(() => {
-                if (isOpen) setTag('');
+                if (isOpen) {
+                    setTagInput('');
+                    setTags([]);
+                }
             }, [isOpen]);
+
+            const addTagsFromText = (raw) => {
+                const parts = String(raw || '').split(/[,\uFF0C]/g).map(s => normalizeTagName(s)).filter(Boolean);
+                if (!parts.length) return;
+                setTags(prev => {
+                    const seen = new Set(prev.map(t => String(t?.name || '').toLowerCase()));
+                    const next = [...prev];
+                    parts.forEach(name => {
+                        const key = name.toLowerCase();
+                        if (seen.has(key)) return;
+                        const color = (Array.isArray(tagPalette) ? tagPalette : []).find(t => String(t?.name || '').toLowerCase() === key)?.color || pickTagColor(name);
+                        next.push({ name, color });
+                        seen.add(key);
+                    });
+                    return next;
+                });
+            };
+
+            const cycleTagColor = (idx) => {
+                setTags(prev => prev.map((t, i) => {
+                    if (i !== idx) return t;
+                    const current = String(t?.color || '');
+                    const list = TAG_COLORS;
+                    const at = list.indexOf(current);
+                    const next = list[(at + 1 + list.length) % list.length];
+                    return { ...t, color: next };
+                }));
+            };
+
+            const removeTagAt = (idx) => {
+                setTags(prev => prev.filter((_, i) => i !== idx));
+            };
 
             const handleSubmit = () => {
                 if (text.trim()) {
-                    onSubmit(text, theme, fontClass, tag);
+                    onSubmit(text, theme, fontClass, tags);
                     setText('');
-                    setTag('');
+                    setTagInput('');
+                    setTags([]);
                     onClose();
                 }
             };
@@ -3072,12 +3556,53 @@
                             onChange={e => setText(e.target.value)} 
                             placeholder="写下你未曾说出口的话..."
                         />
-                        <input
-                            className="modal-input"
-                            value={tag}
-                            onChange={(e) => setTag(e.target.value)}
-                            placeholder="标签（可选）"
-                        />
+                        <div className="picker-group">
+                            <div className="picker-label">标签</div>
+                            {!!tags.length && (
+                                <div className="note-tags" style={{ marginBottom: 12 }}>
+                                    {tags.map((t, idx) => (
+                                        <button
+                                            type="button"
+                                            key={`${t.name}-${idx}`}
+                                            className="note-tag-pill"
+                                            onClick={() => cycleTagColor(idx)}
+                                            title="点击切换颜色"
+                                        >
+                                            <span className="tag-dot" style={{ backgroundColor: t.color }}></span>
+                                            <span className="tag-name">{t.name}</span>
+                                            <span style={{ marginLeft: 4 }} onClick={(e) => { e.stopPropagation(); removeTagAt(idx); }}>✕</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            <input
+                                className="modal-input"
+                                value={tagInput}
+                                onChange={(e) => setTagInput(e.target.value)}
+                                placeholder="输入标签，回车添加（支持逗号批量）"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        addTagsFromText(tagInput);
+                                        setTagInput('');
+                                    }
+                                }}
+                            />
+                            {!!(Array.isArray(tagPalette) ? tagPalette.length : 0) && (
+                                <div className="style-selector" style={{ marginTop: -8 }}>
+                                    {(tagPalette || []).slice().sort((a, b) => (b?.updatedAt || 0) - (a?.updatedAt || 0)).slice(0, 8).map(t => (
+                                        <button
+                                            type="button"
+                                            key={String(t?.name || '')}
+                                            className="style-btn"
+                                            onClick={() => addTagsFromText(t.name)}
+                                        >
+                                            {t.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         <div className="picker-group">
                             <div className="picker-label">便签色调</div>
                             <div className="style-selector">
@@ -3109,6 +3634,110 @@
                         <div className="modal-actions">
                             <button className="action-btn btn-cancel" onClick={onClose}>取消</button>
                             <button className="action-btn btn-confirm" onClick={handleSubmit}>散落</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const TagEditorModal = ({ isOpen, onClose, note, tagPalette, onSave }) => {
+            const [tagInput, setTagInput] = React.useState('');
+            const [tags, setTags] = React.useState([]);
+
+            React.useEffect(() => {
+                if (!isOpen) return;
+                const init = Array.isArray(note?.tags) ? note.tags : [];
+                const cleaned = init
+                    .map(t => ({ name: normalizeTagName(t?.name), color: typeof t?.color === 'string' ? t.color : pickTagColor(t?.name) }))
+                    .filter(t => t.name);
+                setTags(cleaned);
+                setTagInput('');
+            }, [isOpen, note]);
+
+            const addTagsFromText = (raw) => {
+                const parts = String(raw || '').split(/[,\uFF0C]/g).map(s => normalizeTagName(s)).filter(Boolean);
+                if (!parts.length) return;
+                setTags(prev => {
+                    const seen = new Set(prev.map(t => String(t?.name || '').toLowerCase()));
+                    const next = [...prev];
+                    parts.forEach(name => {
+                        const key = name.toLowerCase();
+                        if (seen.has(key)) return;
+                        const color = (Array.isArray(tagPalette) ? tagPalette : []).find(t => String(t?.name || '').toLowerCase() === key)?.color || pickTagColor(name);
+                        next.push({ name, color });
+                        seen.add(key);
+                    });
+                    return next;
+                });
+            };
+
+            const cycleTagColor = (idx) => {
+                setTags(prev => prev.map((t, i) => {
+                    if (i !== idx) return t;
+                    const current = String(t?.color || '');
+                    const list = TAG_COLORS;
+                    const at = list.indexOf(current);
+                    const next = list[(at + 1 + list.length) % list.length];
+                    return { ...t, color: next };
+                }));
+            };
+
+            const removeTagAt = (idx) => {
+                setTags(prev => prev.filter((_, i) => i !== idx));
+            };
+
+            return (
+                <div className={`modal-overlay ${isOpen ? 'open' : ''}`} onClick={(e) => { if(e.target === e.currentTarget) onClose(); }}>
+                    <div className="modal-content">
+                        <h3>编辑标签</h3>
+                        <div className="modal-subtitle">点击标签可以切换颜色；点 ✕ 删除。</div>
+                        {!!tags.length && (
+                            <div className="note-tags" style={{ marginBottom: 14 }}>
+                                {tags.map((t, idx) => (
+                                    <button
+                                        type="button"
+                                        key={`${t.name}-${idx}`}
+                                        className="note-tag-pill"
+                                        onClick={() => cycleTagColor(idx)}
+                                        title="点击切换颜色"
+                                    >
+                                        <span className="tag-dot" style={{ backgroundColor: t.color }}></span>
+                                        <span className="tag-name">{t.name}</span>
+                                        <span style={{ marginLeft: 4 }} onClick={(e) => { e.stopPropagation(); removeTagAt(idx); }}>✕</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <input
+                            className="modal-input"
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            placeholder="输入标签，回车添加（支持逗号批量）"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    addTagsFromText(tagInput);
+                                    setTagInput('');
+                                }
+                            }}
+                        />
+                        {!!(Array.isArray(tagPalette) ? tagPalette.length : 0) && (
+                            <div className="style-selector" style={{ marginTop: -8, marginBottom: 14 }}>
+                                {(tagPalette || []).slice().sort((a, b) => (b?.updatedAt || 0) - (a?.updatedAt || 0)).slice(0, 12).map(t => (
+                                    <button
+                                        type="button"
+                                        key={String(t?.name || '')}
+                                        className="style-btn"
+                                        onClick={() => addTagsFromText(t.name)}
+                                    >
+                                        {t.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <div className="modal-actions">
+                            <button className="action-btn btn-cancel" onClick={onClose}>取消</button>
+                            <button className="action-btn btn-confirm" onClick={() => onSave(tags)}>保存</button>
                         </div>
                     </div>
                 </div>
