@@ -309,6 +309,18 @@
             gap: 10px;
         }
 
+        .controls.compact .soft-icon-btn {
+            width: 46px;
+            height: 46px;
+            font-size: 16px;
+        }
+
+        .controls.compact .soft-icon-btn.label-btn {
+            min-width: 46px;
+            padding: 0 14px;
+            font-size: 12px;
+        }
+
         .arrange-search-wrap {
             display: flex;
             align-items: center;
@@ -3260,7 +3272,7 @@
                         </div>
                     </div>
 
-                    <div className="controls">
+                    <div className={`controls ${mode === 'reading' ? 'compact' : ''}`}>
                         <div className="soft-icon-btn" title="收藏当前句子" onClick={addFavorite}>♥</div>
                         <div className="soft-icon-btn label-btn" title="语录目录" onClick={() => {
                             setIsModalOpen(false);
