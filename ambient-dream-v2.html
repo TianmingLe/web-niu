@@ -3164,6 +3164,20 @@
                                 </div>
                                 <div className="panel-head-tools">
                                     <button
+                                        className={`panel-icon-btn music-compact-play ${isPlaying ? 'active' : ''}`}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!tracks.length) {
+                                                pushToast('还没有音乐');
+                                                return;
+                                            }
+                                            togglePlayback();
+                                        }}
+                                        title={isPlaying ? '暂停' : '播放'}
+                                    >
+                                        {isPlaying ? '❚❚' : '▶'}
+                                    </button>
+                                    <button
                                         className={`panel-icon-btn ${musicDockPinned ? 'active' : ''}`}
                                         onClick={() => {
                                             setMusicDockPinned(prev => !prev);
