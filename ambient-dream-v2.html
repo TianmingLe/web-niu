@@ -321,6 +321,26 @@
             font-size: 12px;
         }
 
+        .ui-refined.mode-reading .controls {
+            opacity: 0.16;
+            transform: translateY(6px) scale(0.985);
+        }
+
+        .ui-refined.mode-reading .controls:hover {
+            opacity: 1;
+            transform: none;
+        }
+
+        .ui-refined.mode-reading .music-dock,
+        .ui-refined.mode-reading .favorites-panel {
+            opacity: 0.74;
+        }
+
+        .ui-refined.mode-reading .music-dock:hover,
+        .ui-refined.mode-reading .favorites-panel:hover {
+            opacity: 1;
+        }
+
         .arrange-search-wrap {
             display: flex;
             align-items: center;
@@ -385,6 +405,10 @@
             backdrop-filter: blur(10px);
             transition: all 0.3s ease;
             font-size: 18px;
+            padding: 0;
+            font-family: inherit;
+            -webkit-appearance: none;
+            appearance: none;
         }
 
         .soft-icon-btn.label-btn {
@@ -402,6 +426,20 @@
             border-color: rgba(255, 255, 255, 0.24);
         }
 
+        .soft-icon-btn:focus-visible,
+        .add-btn:focus-visible,
+        .panel-icon-btn:focus-visible,
+        .music-mini-btn:focus-visible,
+        .tiny-btn:focus-visible,
+        .profile-toggle-btn:focus-visible,
+        .style-btn:focus-visible,
+        .modal-input:focus-visible,
+        .modal-content textarea:focus-visible,
+        .favorites-head-main:focus-visible {
+            outline: 2px solid rgba(168, 149, 184, 0.72);
+            outline-offset: 2px;
+        }
+
         .add-btn {
             width: 60px;
             height: 60px;
@@ -417,6 +455,10 @@
             cursor: pointer;
             backdrop-filter: blur(10px);
             transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            padding: 0;
+            font-family: inherit;
+            -webkit-appearance: none;
+            appearance: none;
         }
 
         .add-btn:hover {
@@ -547,6 +589,27 @@
             background: rgba(255, 255, 255, 0.12);
             border-color: rgba(255, 255, 255, 0.2);
             color: var(--soft-text);
+        }
+
+        .profile-toggle-btn {
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(244, 240, 235, 0.86);
+            border-radius: 999px;
+            height: 34px;
+            padding: 0 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            transition: all 0.25s ease;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .profile-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.10);
+            border-color: rgba(255, 255, 255, 0.22);
         }
 
         .music-actions {
@@ -836,6 +899,17 @@
             cursor: pointer;
             flex: 1;
             min-width: 0;
+        }
+
+        button.favorites-head-main {
+            background: transparent;
+            border: none;
+            padding: 0;
+            text-align: left;
+            color: inherit;
+            font: inherit;
+            -webkit-appearance: none;
+            appearance: none;
         }
 
         .favorites-actions {
@@ -1486,7 +1560,8 @@
             mode: 'ambient-dream-mode',
             tagPalette: 'ambient-dream-tags-palette',
             directoryViewMode: 'ambient-dream-directory-view-mode',
-            appBackupVersion: 'ambient-dream-backup-version'
+            appBackupVersion: 'ambient-dream-backup-version',
+            uiProfile: 'ambient-dream-ui-profile'
         };
 
         const safeReadStorage = (key, fallback) => {
@@ -1799,6 +1874,10 @@
                 const stored = safeReadStorage(STORAGE_KEYS.mode, 'reading');
                 return stored === 'editing' ? 'editing' : 'reading';
             });
+            const [uiProfile, setUiProfile] = React.useState(() => {
+                const stored = safeReadStorage(STORAGE_KEYS.uiProfile, 'classic');
+                return stored === 'refined' ? 'refined' : 'classic';
+            });
             const [directoryViewMode, setDirectoryViewMode] = React.useState(() => {
                 const mode = safeReadStorage(STORAGE_KEYS.directoryViewMode, 'compact');
                 return mode === 'detail' ? 'detail' : 'compact';
@@ -1834,6 +1913,7 @@
             const [favoritesPinned, setFavoritesPinned] = React.useState(false);
             const [audioEnergy, setAudioEnergy] = React.useState(0);
             const [isAutoReading, setIsAutoReading] = React.useState(false);
+            const [arrangePanelOpen, setArrangePanelOpen] = React.useState(false);
             const [viewportProfile, setViewportProfile] = React.useState(() => getViewportProfile());
             const [toasts, setToasts] = React.useState([]);
             
@@ -2194,6 +2274,10 @@
             React.useEffect(() => {
                 writeStorage(STORAGE_KEYS.directoryViewMode, directoryViewMode);
             }, [directoryViewMode]);
+
+            React.useEffect(() => {
+                writeStorage(STORAGE_KEYS.uiProfile, uiProfile);
+            }, [uiProfile]);
 
             React.useEffect(() => {
                 if (mode !== 'reading') return;
@@ -3093,12 +3177,14 @@
             };
 
             const visibleNotes = arrangeMode ? arrangedNotes : droppedNotes;
+            const showArrangeTools = uiProfile === 'classic' || arrangePanelOpen;
 
             const exitArrangeMode = () => {
                 setArrangeMode(false);
                 setArrangeSearch('');
                 setArrangeGroupKey(null);
                 setArrangeGroupPageIndex(0);
+                setArrangePanelOpen(false);
             };
 
             const prevArrangeLayer = () => {
@@ -3115,7 +3201,7 @@
             }, [pushHistory]);
 
             return (
-                <div className={`main-stage viewport-${viewportProfile.mode} mode-${mode}`}>
+                <div className={`main-stage viewport-${viewportProfile.mode} mode-${mode} ui-${uiProfile}`}>
                     <AmbientBackground bgRef={ambientBgRef} />
                     <div className="noise-overlay"></div>
                     
@@ -3273,15 +3359,25 @@
                     </div>
 
                     <div className={`controls ${mode === 'reading' ? 'compact' : ''}`}>
-                        <div className="soft-icon-btn" title="收藏当前句子" onClick={addFavorite}>♥</div>
-                        <div className="soft-icon-btn label-btn" title="语录目录" onClick={() => {
+                        <button type="button" className="soft-icon-btn" title="收藏当前句子" onClick={addFavorite}>♥</button>
+                        <button type="button" className="soft-icon-btn label-btn" title="语录目录" onClick={() => {
                             setIsModalOpen(false);
                             setIsDirectoryOpen(true);
-                        }}>目录</div>
-                        <div className="soft-icon-btn label-btn" title="自动阅读" onClick={() => setIsAutoReading(prev => !prev)}>
+                        }}>目录</button>
+                        <button type="button" className="soft-icon-btn label-btn" title="自动阅读" onClick={() => setIsAutoReading(prev => !prev)}>
                             {isAutoReading ? '停读' : '自读'}
-                        </div>
-                        {arrangeMode && mode === 'editing' && (
+                        </button>
+                        {arrangeMode && mode === 'editing' && uiProfile === 'refined' && (
+                            <button
+                                type="button"
+                                className={`music-mini-btn ${arrangePanelOpen ? 'active' : ''}`}
+                                onClick={() => setArrangePanelOpen(prev => !prev)}
+                                title="展开/收起整理面板"
+                            >
+                                面板
+                            </button>
+                        )}
+                        {arrangeMode && mode === 'editing' && showArrangeTools && (
                             <div className="arrange-groups-wrap">
                                 <button
                                     type="button"
@@ -3307,7 +3403,7 @@
                                 ))}
                             </div>
                         )}
-                        {arrangeMode && mode === 'editing' && (
+                        {arrangeMode && mode === 'editing' && showArrangeTools && (
                             <div className="arrange-filter-wrap">
                                 {(tagPalette || []).slice(0, 10).map(t => {
                                     const key = String(t?.name || '').trim().toLowerCase();
@@ -3357,7 +3453,7 @@
                                 </button>
                             </div>
                         )}
-                        {arrangeMode && mode === 'editing' && (
+                        {arrangeMode && mode === 'editing' && showArrangeTools && (
                             <div className="arrange-search-wrap">
                                 <input
                                     className="arrange-search-input"
@@ -3381,33 +3477,33 @@
                             </div>
                         )}
                         {arrangeMode && mode === 'editing' && (
-                            <div className="soft-icon-btn label-btn" title="上一层" onClick={prevArrangeLayer}>上一层</div>
+                            <button type="button" className="soft-icon-btn label-btn" title="上一层" onClick={prevArrangeLayer}>上一层</button>
                         )}
                         {arrangeMode && mode === 'editing' && (
-                            <div className="soft-icon-btn label-btn" title="下一层" onClick={nextArrangeLayer}>下一层</div>
+                            <button type="button" className="soft-icon-btn label-btn" title="下一层" onClick={nextArrangeLayer}>下一层</button>
                         )}
                         {arrangeMode && mode === 'editing' && (
                             <div className="soft-icon-btn label-btn" title="当前层">{`${currentArrangeGroup?.label || '全部'} ${arrangeGroupPageIndex + 1}/${totalLayers}`}</div>
                         )}
                         {mode === 'editing' && (
-                            <div className="soft-icon-btn label-btn" title={arrangeMode ? "退出整理" : "整理便签"} onClick={arrangeMode ? exitArrangeMode : arrangeNotes}>
+                            <button type="button" className="soft-icon-btn label-btn" title={arrangeMode ? "退出整理" : "整理便签"} onClick={arrangeMode ? exitArrangeMode : arrangeNotes}>
                                 {arrangeMode ? '退出整理' : '整理'}
-                            </div>
+                            </button>
                         )}
                         {mode === 'editing' && (
-                            <div className="soft-icon-btn label-btn" title="撤销" onClick={undo}>撤销</div>
+                            <button type="button" className="soft-icon-btn label-btn" title="撤销" onClick={undo}>撤销</button>
                         )}
                         {mode === 'editing' && focusedNoteId != null && (
-                            <div className="soft-icon-btn label-btn" title="编辑标签" onClick={() => setIsTagEditorOpen(true)}>标签</div>
+                            <button type="button" className="soft-icon-btn label-btn" title="编辑标签" onClick={() => setIsTagEditorOpen(true)}>标签</button>
                         )}
                         {mode === 'editing' && (
-                            <div className="soft-icon-btn label-btn" title="清空便签" onClick={clearAllNotes}>清空</div>
+                            <button type="button" className="soft-icon-btn label-btn" title="清空便签" onClick={clearAllNotes}>清空</button>
                         )}
                         {mode === 'editing' && (
-                            <div className="add-btn" onClick={() => {
+                            <button type="button" className="add-btn" onClick={() => {
                                 setIsDirectoryOpen(false);
                                 setIsModalOpen(true);
-                            }}>+</div>
+                            }}>+</button>
                         )}
                     </div>
 
@@ -3423,10 +3519,19 @@
                         onMouseLeave={() => !favoritesPinned && setFavoritesOpen(false)}
                     >
                         <div className="favorites-head">
-                            <div className="favorites-head-main" onClick={() => setFavoritesOpen(prev => !prev)}>
+                            <button type="button" className="favorites-head-main" onClick={() => setFavoritesOpen(prev => !prev)}>
                                 <div className="favorites-title">FAVORITES</div>
-                            </div>
+                            </button>
                             <button
+                                type="button"
+                                className="profile-toggle-btn"
+                                onClick={() => setUiProfile(prev => prev === 'classic' ? 'refined' : 'classic')}
+                                title="切换界面呈现，不影响内容"
+                            >
+                                {uiProfile === 'classic' ? '沉浸+' : '经典'}
+                            </button>
+                            <button
+                                type="button"
                                 className={`panel-icon-btn ${favoritesPinned ? 'active' : ''}`}
                                 onClick={() => {
                                     setFavoritesPinned(prev => !prev);
