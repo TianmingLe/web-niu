@@ -591,6 +591,13 @@
             color: var(--soft-text);
         }
 
+        .pin-svg {
+            width: 14px;
+            height: 14px;
+            display: block;
+            pointer-events: none;
+        }
+
         .profile-toggle-btn {
             border: 1px solid rgba(255, 255, 255, 0.14);
             background: rgba(255, 255, 255, 0.06);
@@ -853,7 +860,7 @@
         }
 
         .favorites-panel.collapsed {
-            width: 200px;
+            width: 240px;
             max-height: 62px;
             background: rgba(22, 24, 34, 0.44);
         }
@@ -899,6 +906,7 @@
             cursor: pointer;
             flex: 1;
             min-width: 0;
+            overflow: hidden;
         }
 
         button.favorites-head-main {
@@ -910,6 +918,12 @@
             font: inherit;
             -webkit-appearance: none;
             appearance: none;
+        }
+
+        .favorites-title {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .favorites-actions {
@@ -3283,7 +3297,10 @@
                                         }}
                                         title="锁定音乐坞"
                                     >
-                                        钉
+                                        <svg className="pin-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                            <path d="M14 2H10v5l-2 2v3h8V9l-2-2V2z" />
+                                            <path d="M12 12v10" />
+                                        </svg>
                                     </button>
                                 </div>
                             </div>
@@ -3539,7 +3556,10 @@
                                 }}
                                 title="锁定收藏夹"
                             >
-                                钉
+                                <svg className="pin-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <path d="M14 2H10v5l-2 2v3h8V9l-2-2V2z" />
+                                    <path d="M12 12v10" />
+                                </svg>
                             </button>
                         </div>
                         <div className="favorites-body">
