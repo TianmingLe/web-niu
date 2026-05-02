@@ -23,17 +23,17 @@ test('accumulateWheelNavigation triggers prev on upward scroll', () => {
   assert.equal(state.acc, 0);
 });
 
-test('createSummerMeadowLayout generates mixed grass and flowers within bottom band', () => {
+test('createSummerMeadowLayout supports higher grass-to-flower ratio', () => {
   const { createSummerMeadowLayout } = require('../ambient-dream-utils.js');
   const out = createSummerMeadowLayout({
     width: 1000,
     height: 800,
-    bladeCount: 60,
-    flowerCount: 90,
+    bladeCount: 180,
+    flowerCount: 50,
     seed: 42,
   });
-  assert.equal(out.grass.length, 60);
-  assert.equal(out.flowers.length, 90);
+  assert.equal(out.grass.length, 180);
+  assert.equal(out.flowers.length, 50);
 
   const kinds = new Set(out.grass.map(g => g.kind));
   assert.ok(kinds.has('blade'));

@@ -3448,8 +3448,8 @@
                     const tier = (reducedMotion || vfxLevel === 'low' || degraded) ? 'low' : 'high';
                     const existing = ctx.__summerMeadow;
                     if (existing && existing.w === geom.w && existing.h === geom.h && existing.tier === tier) return existing;
-                    const bladeCount = tier === 'low' ? 70 : 160;
-                    const flowerCount = tier === 'low' ? 90 : 190;
+                    const bladeCount = tier === 'low' ? 110 : 240;
+                    const flowerCount = tier === 'low' ? 34 : 80;
                     const factory = window.AmbientDreamUtils?.createSummerMeadowLayout;
                     const layout = (typeof factory === 'function')
                         ? factory({ width: geom.w, height: geom.h, bladeCount, flowerCount, seed: 7331 })
@@ -3555,7 +3555,7 @@
                         const fadeBottom = fy >= fadeStart
                             ? Math.max(0, Math.min(1, 1 - (fy - fadeStart) / Math.max(1, (fadeEnd - fadeStart))))
                             : 1;
-                        const tw = 0.55 + 0.45 * Math.sin(t * 0.0040 * f.f + f.phase);
+                        const tw = 0.55 + 0.45 * Math.sin(t * 0.0022 * f.f + f.phase);
                         const a = (0.22 + 0.26 * tw) * k * fadeBottom;
                         if (a <= 0.0015) return;
                         ctx.save();
