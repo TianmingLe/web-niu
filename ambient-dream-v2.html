@@ -3442,12 +3442,104 @@
                     return Math.max(0, Math.floor(base * mult * Math.max(0, intensity)));
                 };
 
+                const getSummerMeadowCache = (ctx, geom) => {
+                    const tier = (reducedMotion || vfxLevel === 'low' || degraded) ? 'low' : 'high';
+                    const existing = ctx.__summerMeadow;
+                    if (existing && existing.w === geom.w && existing.h === geom.h && existing.tier === tier) return existing;
+                    const bladeCount = tier === 'low' ? 26 : 56;
+                    const flowerCount = tier === 'low' ? 50 : 110;
+                    const factory = window.AmbientDreamUtils?.createSummerMeadowLayout;
+                    const layout = (typeof factory === 'function')
+                        ? factory({ width: geom.w, height: geom.h, bladeCount, flowerCount, seed: 7331 })
+                        : { blades: [], flowers: [] };
+                    const cache = { w: geom.w, h: geom.h, tier, blades: layout.blades || [], flowers: layout.flowers || [] };
+                    ctx.__summerMeadow = cache;
+                    return cache;
+                };
+
+                const drawSummerMeadow = (ctx, geom, t, clearZone, intensity) => {
+                    const cache = getSummerMeadowCache(ctx, geom);
+                    const w = geom.w;
+                    const h = geom.h;
+                    const low = cache.tier === 'low';
+                    const wind = reducedMotion ? 0 : (low ? 0.85 : 1);
+                    const swayBase = (low ? 10 : 16) * wind;
+                    const k = (intensity ?? 1);
+                    const fadeBottomStart = h * 0.90;
+                    const fadeBottomEnd = h * 0.985;
+                    const safeTop = clearZone ? Math.min(h, clearZone.y + clearZone.r * 0.75) : h * 0.64;
+
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.lineCap = 'round';
+                    const g = ctx.createLinearGradient(0, h * 0.68, 0, h);
+                    g.addColorStop(0, 'rgba(56, 90, 82, 0.00)');
+                    g.addColorStop(1, 'rgba(56, 90, 82, 0.22)');
+                    ctx.globalAlpha = 0.55 * k;
+                    ctx.fillStyle = g;
+                    ctx.fillRect(0, h * 0.68, w, h * 0.32);
+
+                    const drawBlade = (b, i) => {
+                        if (b.y < safeTop) return;
+                        const by = b.y;
+                        const fadeBottom = by >= fadeBottomStart
+                            ? Math.max(0, Math.min(1, 1 - (by - fadeBottomStart) / Math.max(1, (fadeBottomEnd - fadeBottomStart))))
+                            : 1;
+                        const baseAlpha = (0.16 + 0.12 * Math.sin((t * 0.0008) + b.phase)) * k * fadeBottom;
+                        if (baseAlpha <= 0.002) return;
+                        const sway = Math.sin(t * 0.0012 * b.f + b.phase) * swayBase;
+                        const tipX = b.x + sway + b.lean * b.h * 0.6;
+                        const tipY = by - b.h;
+                        const midX = b.x + sway * 0.25 + b.lean * b.h * 0.32;
+                        const midY = by - b.h * 0.55;
+                        ctx.globalAlpha = baseAlpha;
+                        ctx.strokeStyle = (i % 7 === 0) ? 'rgba(210, 244, 220, 1)' : 'rgba(146, 210, 168, 1)';
+                        ctx.lineWidth = b.w;
+                        ctx.beginPath();
+                        ctx.moveTo(b.x, by);
+                        ctx.quadraticCurveTo(midX, midY, tipX, tipY);
+                        ctx.stroke();
+                    };
+
+                    const drawFlower = (f, i) => {
+                        if (f.y < safeTop) return;
+                        const fy = f.y;
+                        const fadeStart = h * 0.94;
+                        const fadeEnd = h * 0.99;
+                        const fadeBottom = fy >= fadeStart
+                            ? Math.max(0, Math.min(1, 1 - (fy - fadeStart) / Math.max(1, (fadeEnd - fadeStart))))
+                            : 1;
+                        const tw = 0.55 + 0.45 * Math.sin(t * 0.0040 * f.f + f.phase);
+                        const a = (0.24 + 0.22 * tw) * k * fadeBottom;
+                        if (a <= 0.0015) return;
+                        ctx.save();
+                        ctx.globalAlpha = a;
+                        ctx.fillStyle = (i % 5 === 0) ? 'rgba(255, 190, 220, 1)' : 'rgba(248, 242, 230, 1)';
+                        ctx.shadowColor = (i % 5 === 0) ? 'rgba(255, 190, 220, 0.42)' : 'rgba(248, 242, 230, 0.38)';
+                        ctx.shadowBlur = 18 + 16 * tw;
+                        const rr = f.r * (0.9 + 0.25 * tw);
+                        const s = Math.sin(f.phase) * 0.6;
+                        const c = Math.cos(f.phase) * 0.6;
+                        ctx.beginPath();
+                        ctx.arc(f.x + rr * 0.9, fy + rr * 0.2, rr, 0, Math.PI * 2);
+                        ctx.arc(f.x - rr * 0.4 + s, fy - rr * 0.6 + c, rr * 0.92, 0, Math.PI * 2);
+                        ctx.arc(f.x - rr * 0.5 - c, fy + rr * 0.55 + s, rr * 0.88, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    };
+
+                    cache.blades.forEach(drawBlade);
+                    cache.flowers.forEach(drawFlower);
+                    ctx.restore();
+                };
+
                 const tickLayer = (season, geom, ctx, particles, ripples, rng, dt, t, clearZone, intensity) => {
                     if (!ctx || !season) {
                         if (ctx) ctx.clearRect(0, 0, geom.w, geom.h);
                         return { particles: [], ripples: [] };
                     }
                     ctx.clearRect(0, 0, geom.w, geom.h);
+                    if (season === 'summer') drawSummerMeadow(ctx, geom, t, clearZone, intensity);
                     const target = getTargetCount(season, intensity);
                     const spawnOutside = () => {
                         for (let i = 0; i < 14; i++) {

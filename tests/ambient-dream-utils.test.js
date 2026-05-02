@@ -23,3 +23,29 @@ test('accumulateWheelNavigation triggers prev on upward scroll', () => {
   assert.equal(state.acc, 0);
 });
 
+test('createSummerMeadowLayout generates blades and flowers within bottom band', () => {
+  const { createSummerMeadowLayout } = require('../ambient-dream-utils.js');
+  const out = createSummerMeadowLayout({
+    width: 1000,
+    height: 800,
+    bladeCount: 60,
+    flowerCount: 90,
+    seed: 42,
+  });
+  assert.equal(out.blades.length, 60);
+  assert.equal(out.flowers.length, 90);
+  out.blades.forEach((b) => {
+    assert.ok(Number.isFinite(b.x));
+    assert.ok(Number.isFinite(b.y));
+    assert.ok(b.y >= 800 * 0.70 && b.y <= 800 * 0.98);
+    assert.ok(b.x >= -80 && b.x <= 1080);
+    assert.ok(b.h >= 20 && b.h <= 130);
+  });
+  out.flowers.forEach((f) => {
+    assert.ok(Number.isFinite(f.x));
+    assert.ok(Number.isFinite(f.y));
+    assert.ok(f.y >= 800 * 0.74 && f.y <= 800 * 0.96);
+    assert.ok(f.x >= -80 && f.x <= 1080);
+    assert.ok(f.r >= 1.8 && f.r <= 4.6);
+  });
+});
