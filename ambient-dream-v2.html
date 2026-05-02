@@ -2177,6 +2177,11 @@
             const noteRef = React.useRef(null);
             const hasEnteredRef = React.useRef(false);
             const longPressTimerRef = React.useRef(null);
+            const isFocusedRef = React.useRef(!!isFocused);
+
+            React.useEffect(() => {
+                isFocusedRef.current = !!isFocused;
+            }, [isFocused]);
 
             React.useEffect(() => {
                 const el = noteRef.current;
@@ -2201,7 +2206,7 @@
                         const rot = Number(gsap.getProperty(el, 'rotation')) || 0;
                         onMoveEnd?.(id, { x, y, rot });
                         // 松开时：恢复背景状态，但保留当前位置
-                        if (isFocused) {
+                        if (isFocusedRef.current) {
                             gsap.to(el, {
                                 scale: 1.06,
                                 opacity: 0.96,
@@ -2290,7 +2295,7 @@
                     const d = Draggable.get(el);
                     if (d) d.kill();
                 };
-            }, [id, isFocused, onFocus, onMoveEnd]);
+            }, [id, onFocus, onMoveEnd]);
 
             React.useEffect(() => {
                 const el = noteRef.current;
@@ -3607,20 +3612,43 @@
             React.useEffect(() => {
                 let timer = null;
                 let dragging = false;
+                let start = null;
                 const clear = () => {
                     if (timer) {
                         window.clearTimeout(timer);
                         timer = null;
                     }
                     dragging = false;
+                    start = null;
                     seasonVfxRef.current?.clearDisturb?.();
                 };
                 const onPointerDown = (e) => {
                     if (isModalOpen || isDirectoryOpen) return;
-                    if (e.target?.closest?.('.memory-note, .controls, .music-dock, .favorites-panel, .modal-overlay')) return;
+                    const t = e.target;
+                    const path = (typeof e.composedPath === 'function') ? e.composedPath() : null;
+                    const isBlocked = (() => {
+                        if (t && typeof t.closest === 'function') {
+                            return !!t.closest('.memory-note, .controls, .music-dock, .favorites-panel, .modal-overlay');
+                        }
+                        if (Array.isArray(path)) {
+                            for (const n of path) {
+                                if (!n || !n.classList) continue;
+                                if (
+                                    n.classList.contains('memory-note') ||
+                                    n.classList.contains('controls') ||
+                                    n.classList.contains('music-dock') ||
+                                    n.classList.contains('favorites-panel') ||
+                                    n.classList.contains('modal-overlay')
+                                ) return true;
+                            }
+                        }
+                        return false;
+                    })();
+                    if (isBlocked) return;
                     clear();
                     seasonVfxRef.current?.addRipple?.(e.clientX, e.clientY);
                     dragging = true;
+                    start = { x: e.clientX, y: e.clientY };
                     seasonVfxRef.current?.setDisturb?.(e.clientX, e.clientY);
                     timer = window.setTimeout(() => {
                         setMode(prev => {
@@ -3632,6 +3660,14 @@
                 };
                 const onPointerMove = (e) => {
                     if (!dragging) return;
+                    if (timer && start) {
+                        const dx = e.clientX - start.x;
+                        const dy = e.clientY - start.y;
+                        if ((dx * dx + dy * dy) > 64) {
+                            window.clearTimeout(timer);
+                            timer = null;
+                        }
+                    }
                     seasonVfxRef.current?.setDisturb?.(e.clientX, e.clientY);
                 };
                 window.addEventListener('pointerdown', onPointerDown, { passive: true });
