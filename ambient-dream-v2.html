@@ -579,12 +579,15 @@
             box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
             transition: background 0.35s ease, box-shadow 0.35s ease, opacity 0.35s ease, transform 0.35s ease;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         .music-dock.collapsed {
-            width: min(420px, 44vw);
-            min-width: 340px;
-            max-width: min(420px, 44vw);
+            display: inline-flex;
+            width: fit-content;
+            min-width: 0;
+            max-width: min(360px, 62vw);
             max-height: 72px;
             background: rgba(22, 24, 34, 0.46);
         }
@@ -618,6 +621,19 @@
             justify-content: space-between;
             gap: 14px;
             flex-wrap: nowrap;
+        }
+
+        .music-dock.collapsed .music-top {
+            justify-content: flex-start;
+        }
+
+        .music-dock.collapsed .panel-head {
+            flex: 0 1 auto;
+        }
+
+        .music-dock.collapsed .music-meta {
+            flex: 0 1 auto;
+            max-width: min(220px, 42vw);
         }
 
         .music-dock.collapsed .music-actions {
@@ -1123,6 +1139,16 @@
             transition: opacity 0.4s ease;
         }
 
+        .bottom-center-stack .love-side-note {
+            position: static;
+            left: auto;
+            bottom: auto;
+            transform: none;
+            z-index: auto;
+            width: min(72vw, 720px);
+            text-align: center;
+        }
+
         /* 模态框 */
         .modal-overlay {
             position: fixed;
@@ -1454,6 +1480,29 @@
             z-index: 50;
         }
 
+        .bottom-center-stack {
+            position: absolute;
+            left: 50%;
+            bottom: 42px;
+            transform: translateX(-50%);
+            z-index: 120;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            width: min(72vw, 720px);
+            pointer-events: none;
+            text-align: center;
+        }
+
+        .bottom-center-stack .hint {
+            position: static;
+            bottom: auto;
+            left: auto;
+            transform: none;
+            z-index: auto;
+        }
+
         .whisper {
             position: relative;
             display: inline-block;
@@ -1488,9 +1537,22 @@
             transition: opacity 0.6s ease, transform 0.6s ease;
         }
 
+        .bottom-center-stack .breath-progress {
+            position: static;
+            bottom: auto;
+            left: auto;
+            transform: none;
+            z-index: auto;
+            margin-bottom: 2px;
+        }
+
         .breath-progress.visible {
             opacity: 0.92;
             transform: translateX(-50%) translateY(0);
+        }
+
+        .bottom-center-stack .breath-progress.visible {
+            transform: none;
         }
 
         .breath-line {
@@ -1510,7 +1572,7 @@
             inset: 0;
             background: linear-gradient(90deg, transparent, rgba(244, 240, 235, 0.55), transparent);
             opacity: 0.55;
-            animation: breathGlow 3.2s ease-in-out infinite;
+            animation: breathGlow var(--breath-period, 5600ms) ease-in-out infinite;
         }
 
         .breath-dot {
@@ -1522,17 +1584,12 @@
             background: rgba(244, 240, 235, 0.72);
             transform: translateY(-50%);
             box-shadow: 0 0 0 6px rgba(244, 240, 235, 0.06);
-            animation: dotDrift 3.2s ease-in-out infinite;
+            left: var(--breath-dot-x, 10px);
         }
 
         @keyframes breathGlow {
             0%, 100% { opacity: 0.25; }
             50% { opacity: 0.72; }
-        }
-
-        @keyframes dotDrift {
-            0%, 100% { left: 10px; opacity: 0.45; }
-            50% { left: calc(100% - 16px); opacity: 0.9; }
         }
 
         .reunion-btn {
@@ -1552,6 +1609,15 @@
             cursor: pointer;
             -webkit-appearance: none;
             appearance: none;
+        }
+
+        .bottom-center-stack .reunion-btn {
+            position: static;
+            bottom: auto;
+            left: auto;
+            transform: none;
+            z-index: auto;
+            pointer-events: auto;
         }
 
         .reunion-btn:hover {
@@ -1575,6 +1641,15 @@
             font-size: 12px;
             letter-spacing: 0.08em;
             pointer-events: none;
+        }
+
+        .bottom-center-stack .reunion-nudge {
+            position: static;
+            bottom: auto;
+            left: auto;
+            transform: none;
+            z-index: auto;
+            width: min(72vw, 720px);
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -1856,6 +1931,7 @@
         const FONT_PRESETS = ['font-serif', 'font-kaiti', 'font-fangsong', 'font-sans', 'font-rounded'];
         const TAG_COLORS = ['#a895b8', '#98aebb', '#8fa58f', '#7f809a', '#c8a7a7', '#b1c6b1', '#d0c3a8', '#9fb6c4'];
         const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+        const AUTO_READ_INTERVAL_MS = 5600;
 
         const getSeasonByNoteCount = (count) => {
             if (!Number.isFinite(count) || count <= 5) return null;
@@ -2414,6 +2490,8 @@
             const seasonCanvasRef = React.useRef(null);
             const seasonCanvasNextRef = React.useRef(null);
             const seasonVfxRef = React.useRef(null);
+            const breathProgressRef = React.useRef(null);
+            const autoReadLastTickRef = React.useRef(0);
 
             const pushToast = React.useCallback((message) => {
                 const id = ++toastIdRef.current;
@@ -2977,9 +3055,13 @@
 
             React.useEffect(() => {
                 if (!isAutoReading || isModalOpen) return;
+                autoReadLastTickRef.current = performance.now();
                 const timer = window.setInterval(() => {
-                    if (!isAnimating) handleNext();
-                }, 5600);
+                    if (!isAnimating) {
+                        handleNext();
+                        autoReadLastTickRef.current = performance.now();
+                    }
+                }, AUTO_READ_INTERVAL_MS);
                 return () => window.clearInterval(timer);
             }, [isAutoReading, isModalOpen, isAnimating, currentIndex, comments.length]);
 
@@ -3073,6 +3155,30 @@
                     window.clearTimeout(t);
                 };
             }, []);
+
+            React.useEffect(() => {
+                const el = breathProgressRef.current;
+                if (!el) return;
+                if (!isAutoReading || reducedMotion) {
+                    el.style.removeProperty('--breath-dot-x');
+                    el.style.removeProperty('--breath-period');
+                    return;
+                }
+                el.style.setProperty('--breath-period', `${AUTO_READ_INTERVAL_MS}ms`);
+                let raf = 0;
+                const loop = () => {
+                    const now = performance.now();
+                    const elapsed = now - autoReadLastTickRef.current;
+                    const p = Math.max(0, Math.min(1, elapsed / AUTO_READ_INTERVAL_MS));
+                    const x = 10 + p * (160 - 16);
+                    el.style.setProperty('--breath-dot-x', `${x.toFixed(1)}px`);
+                    raf = window.requestAnimationFrame(loop);
+                };
+                raf = window.requestAnimationFrame(loop);
+                return () => {
+                    if (raf) window.cancelAnimationFrame(raf);
+                };
+            }, [isAutoReading, reducedMotion]);
 
             React.useEffect(() => {
                 const canvasA = seasonCanvasRef.current;
@@ -3955,31 +4061,33 @@
                         </div>
                     </div>
 
-                    <div className={`breath-progress ${(isAutoReading && !isUserInteracting) ? 'visible' : ''}`} aria-hidden="true">
-                        <div className="breath-line"></div>
-                        <div className="breath-dot"></div>
-                    </div>
-                    <div className="hint">
-                        <WhisperText
-                            imagery="风在读，你只需要慢一点。"
-                            literal="滚动鼠标或上滑屏幕，潜入意识深处"
-                            forceLiteral={isUserInteracting}
-                        />
-                    </div>
-                    <button type="button" className="reunion-btn" onClick={handleReunionClick} title={favorites.length ? '随机翻一条收藏' : '先收藏几句，再来相遇'}>
-                        再遇见一条
-                    </button>
-                    {!!reunionNudgeOpen && (
-                        <div className="reunion-nudge">
+                    <div className="bottom-center-stack">
+                        <div ref={breathProgressRef} className={`breath-progress ${(isAutoReading && !isUserInteracting) ? 'visible' : ''}`} aria-hidden="true">
+                            <div className="breath-line"></div>
+                            <div className="breath-dot"></div>
+                        </div>
+                        <div className="hint">
                             <WhisperText
-                                imagery="喜欢的句子，会在这里慢慢聚拢。"
-                                literal="先点一下 ♥，把这句收藏起来。"
+                                imagery="风在读，你只需要慢一点。"
+                                literal="滚动鼠标或上滑屏幕，潜入意识深处"
                                 forceLiteral={isUserInteracting}
-                                initialMs={1600}
                             />
                         </div>
-                    )}
-                    <div className="love-side-note">{loveAside}</div>
+                        <button type="button" className="reunion-btn press-jelly" onClick={handleReunionClick} title={favorites.length ? '随机翻一条收藏' : '先收藏几句，再来相遇'}>
+                            再遇见一条
+                        </button>
+                        {!!reunionNudgeOpen && (
+                            <div className="reunion-nudge">
+                                <WhisperText
+                                    imagery="喜欢的句子，会在这里慢慢聚拢。"
+                                    literal="先点一下 ♥，把这句收藏起来。"
+                                    forceLiteral={isUserInteracting}
+                                    initialMs={1600}
+                                />
+                            </div>
+                        )}
+                        <div className="love-side-note">{loveAside}</div>
+                    </div>
 
                     <div
                         className={`music-dock ${(musicDockOpen || musicDockPinned) ? 'expanded' : 'collapsed'}`}
