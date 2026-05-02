@@ -3448,7 +3448,7 @@
                     const tier = (reducedMotion || vfxLevel === 'low' || degraded) ? 'low' : 'high';
                     const existing = ctx.__summerMeadow;
                     if (existing && existing.w === geom.w && existing.h === geom.h && existing.tier === tier) return existing;
-                    const bladeCount = tier === 'low' ? 110 : 240;
+                    const bladeCount = tier === 'low' ? 160 : 320;
                     const flowerCount = tier === 'low' ? 34 : 80;
                     const factory = window.AmbientDreamUtils?.createSummerMeadowLayout;
                     const layout = (typeof factory === 'function')
