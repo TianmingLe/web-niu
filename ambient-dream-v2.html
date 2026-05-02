@@ -1532,7 +1532,7 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 52;
-            width: 140px;
+            width: 120px;
             height: 18px;
             opacity: 0;
             pointer-events: none;
@@ -2180,10 +2180,20 @@
             const hasEnteredRef = React.useRef(false);
             const longPressTimerRef = React.useRef(null);
             const isFocusedRef = React.useRef(!!isFocused);
+            const onMoveEndRef = React.useRef(onMoveEnd);
+            const onFocusRef = React.useRef(onFocus);
 
             React.useEffect(() => {
                 isFocusedRef.current = !!isFocused;
             }, [isFocused]);
+
+            React.useEffect(() => {
+                onMoveEndRef.current = onMoveEnd;
+            }, [onMoveEnd]);
+
+            React.useEffect(() => {
+                onFocusRef.current = onFocus;
+            }, [onFocus]);
 
             React.useEffect(() => {
                 const el = noteRef.current;
@@ -2206,7 +2216,7 @@
                         const x = Number(gsap.getProperty(el, 'x')) || 0;
                         const y = Number(gsap.getProperty(el, 'y')) || 0;
                         const rot = Number(gsap.getProperty(el, 'rotation')) || 0;
-                        onMoveEnd?.(id, { x, y, rot });
+                        onMoveEndRef.current?.(id, { x, y, rot });
                         // 松开时：恢复背景状态，但保留当前位置
                         if (isFocusedRef.current) {
                             gsap.to(el, {
@@ -2263,7 +2273,7 @@
                         ease: "power2.inOut"
                     });
                 };
-                const onDoubleClick = () => onFocus?.(id);
+                const onDoubleClick = () => onFocusRef.current?.(id);
                 const clearLongPress = () => {
                     if (longPressTimerRef.current) {
                         window.clearTimeout(longPressTimerRef.current);
@@ -2273,7 +2283,7 @@
                 const onTouchStart = () => {
                     clearLongPress();
                     longPressTimerRef.current = window.setTimeout(() => {
-                        onFocus?.(id);
+                        onFocusRef.current?.(id);
                     }, 420);
                 };
                 const onTouchEnd = () => clearLongPress();
@@ -2297,7 +2307,7 @@
                     const d = Draggable.get(el);
                     if (d) d.kill();
                 };
-            }, [id, onFocus, onMoveEnd]);
+            }, [id]);
 
             React.useEffect(() => {
                 const el = noteRef.current;
@@ -3737,6 +3747,31 @@
                 setProgress(ratio * 100);
             }, []);
 
+            const beginSeekPointerDrag = React.useCallback((event) => {
+                const audio = audioRef.current;
+                const bar = progressRef.current;
+                if (!audio || !bar || !audio.duration) return;
+                event.preventDefault();
+                try {
+                    bar.setPointerCapture?.(event.pointerId);
+                } catch {}
+                handleSeek(event);
+                const move = (moveEvent) => handleSeek(moveEvent);
+                const end = () => {
+                    bar.removeEventListener('pointermove', move);
+                    bar.removeEventListener('pointerup', end);
+                    bar.removeEventListener('pointercancel', end);
+                    try {
+                        bar.releasePointerCapture?.(event.pointerId);
+                    } catch {}
+                };
+                seekCleanupRef.current?.();
+                seekCleanupRef.current = end;
+                bar.addEventListener('pointermove', move);
+                bar.addEventListener('pointerup', end);
+                bar.addEventListener('pointercancel', end);
+            }, [handleSeek]);
+
             const beginSeekDrag = (event) => {
                 event.preventDefault();
                 handleSeek(event);
@@ -4218,8 +4253,7 @@
                                     className="music-progress"
                                     style={{ '--progress': `${progress}%` }}
                                     onClick={handleSeek}
-                                    onMouseDown={beginSeekDrag}
-                                    onTouchStart={beginSeekDrag}
+                                    onPointerDown={beginSeekPointerDrag}
                                 >
                                     <span></span>
                                 </div>
