@@ -130,15 +130,15 @@
             transform: translate3d(calc(var(--px) * 12px), calc(var(--py) * 12px), 0);
         }
 
-        .season-far.spring { background: radial-gradient(1100px 700px at 20% 18%, rgba(168,149,184,0.20), transparent 60%), radial-gradient(900px 520px at 80% 35%, rgba(152,174,187,0.18), transparent 62%), linear-gradient(180deg, rgba(16,17,24,1), rgba(16,17,24,1)); }
-        .season-far.summer { background: radial-gradient(900px 620px at 22% 22%, rgba(96,108,160,0.22), transparent 62%), radial-gradient(1100px 700px at 78% 36%, rgba(132,94,166,0.20), transparent 64%), linear-gradient(180deg, rgba(16,17,24,1), rgba(16,17,24,1)); }
-        .season-far.autumn { background: radial-gradient(900px 620px at 24% 24%, rgba(208,195,168,0.20), transparent 62%), radial-gradient(1100px 700px at 78% 44%, rgba(200,167,167,0.18), transparent 64%), linear-gradient(180deg, rgba(16,17,24,1), rgba(16,17,24,1)); }
-        .season-far.winter { background: radial-gradient(900px 620px at 22% 22%, rgba(152,174,187,0.22), transparent 62%), radial-gradient(1100px 700px at 78% 44%, rgba(127,128,154,0.16), transparent 64%), linear-gradient(180deg, rgba(16,17,24,1), rgba(16,17,24,1)); }
+        .season-far.spring { background: radial-gradient(860px 560px at 18% 16%, rgba(206, 168, 212, 0.30), transparent 62%), radial-gradient(1100px 700px at 20% 18%, rgba(168,149,184,0.16), transparent 62%), radial-gradient(900px 520px at 80% 35%, rgba(152,174,187,0.14), transparent 64%), linear-gradient(180deg, rgba(16,17,24,1), rgba(16,17,24,1)); }
+        .season-far.summer { background: radial-gradient(860px 560px at 82% 20%, rgba(116, 140, 214, 0.30), transparent 62%), radial-gradient(900px 620px at 22% 22%, rgba(96,108,160,0.16), transparent 64%), radial-gradient(1100px 700px at 78% 36%, rgba(132,94,166,0.14), transparent 66%), linear-gradient(180deg, rgba(16,17,24,1), rgba(16,17,24,1)); }
+        .season-far.autumn { background: radial-gradient(860px 560px at 22% 78%, rgba(218, 198, 146, 0.30), transparent 64%), radial-gradient(900px 620px at 24% 24%, rgba(208,195,168,0.16), transparent 64%), radial-gradient(1100px 700px at 78% 44%, rgba(200,167,167,0.14), transparent 66%), linear-gradient(180deg, rgba(16,17,24,1), rgba(16,17,24,1)); }
+        .season-far.winter { background: radial-gradient(920px 620px at 52% 14%, rgba(136, 168, 188, 0.28), transparent 64%), radial-gradient(900px 620px at 22% 22%, rgba(152,174,187,0.16), transparent 64%), radial-gradient(1100px 700px at 78% 44%, rgba(127,128,154,0.12), transparent 66%), linear-gradient(180deg, rgba(16,17,24,1), rgba(16,17,24,1)); }
 
-        .season-mid.spring { background: radial-gradient(520px 280px at 18% 20%, rgba(250,244,238,0.06), transparent 62%), radial-gradient(600px 340px at 84% 30%, rgba(168,149,184,0.08), transparent 66%); filter: blur(10px); }
-        .season-mid.summer { background: radial-gradient(540px 300px at 18% 26%, rgba(250,244,238,0.05), transparent 64%), radial-gradient(600px 360px at 84% 34%, rgba(132,94,166,0.08), transparent 66%); filter: blur(11px); }
-        .season-mid.autumn { background: radial-gradient(540px 300px at 18% 26%, rgba(250,244,238,0.05), transparent 64%), radial-gradient(600px 360px at 84% 34%, rgba(208,195,168,0.08), transparent 66%); filter: blur(11px); }
-        .season-mid.winter { background: radial-gradient(540px 300px at 18% 24%, rgba(250,244,238,0.05), transparent 64%), radial-gradient(600px 360px at 84% 34%, rgba(152,174,187,0.08), transparent 66%); filter: blur(12px); }
+        .season-mid.spring { background: radial-gradient(560px 320px at 22% 18%, rgba(250,244,238,0.06), transparent 64%), radial-gradient(560px 340px at 78% 28%, rgba(206, 168, 212, 0.10), transparent 68%); filter: blur(10px); }
+        .season-mid.summer { background: radial-gradient(560px 320px at 22% 26%, rgba(250,244,238,0.05), transparent 66%), radial-gradient(620px 360px at 84% 34%, rgba(116, 140, 214, 0.10), transparent 70%); filter: blur(11px); }
+        .season-mid.autumn { background: radial-gradient(560px 320px at 20% 30%, rgba(250,244,238,0.05), transparent 66%), radial-gradient(640px 380px at 78% 42%, rgba(218, 198, 146, 0.10), transparent 70%); filter: blur(11px); }
+        .season-mid.winter { background: radial-gradient(560px 320px at 18% 24%, rgba(250,244,238,0.05), transparent 66%), radial-gradient(660px 400px at 84% 34%, rgba(136, 168, 188, 0.10), transparent 70%); filter: blur(12px); }
 
         .season-canvas {
             position: absolute;
@@ -229,19 +229,23 @@
         }
 
         .season-spring .memory-note::after {
-            border-color: rgba(168, 149, 184, 0.18);
+            border-color: rgba(206, 168, 212, 0.24);
+            opacity: 0.78;
         }
 
         .season-summer .memory-note::after {
-            border-color: rgba(132, 94, 166, 0.18);
+            border-color: rgba(116, 140, 214, 0.22);
+            opacity: 0.76;
         }
 
         .season-autumn .memory-note::after {
-            border-color: rgba(208, 195, 168, 0.18);
+            border-color: rgba(218, 198, 146, 0.22);
+            opacity: 0.76;
         }
 
         .season-winter .memory-note::after {
-            border-color: rgba(152, 174, 187, 0.22);
+            border-color: rgba(136, 168, 188, 0.26);
+            opacity: 0.80;
         }
 
         .note-tags {
@@ -1961,70 +1965,220 @@
         };
 
         const spawnSeasonParticle = (season, rng, w, h) => {
+            if (!season) return null;
+            if (season === 'winter') {
+                const fog = rng() < 0.78;
+                if (fog) {
+                    const edge = rng() < 0.5;
+                    const x = edge ? (rng() < 0.5 ? -60 - rng() * 120 : w + 60 + rng() * 120) : rng() * w;
+                    const y = 24 + rng() * (h * 0.80);
+                    return {
+                        kind: 'fog',
+                        x,
+                        y,
+                        vx: (rng() - 0.5) * 0.10,
+                        vy: 0.03 + rng() * 0.06,
+                        rot: 0,
+                        vr: 0,
+                        size: 34 + rng() * 88,
+                        alpha: 0.030 + rng() * 0.060,
+                        tw: rng(),
+                        seed: rng()
+                    };
+                }
+                const x = rng() * w;
+                const y = -30 - rng() * 50;
+                return {
+                    kind: 'snow',
+                    x,
+                    y,
+                    vx: (rng() - 0.5) * 0.10,
+                    vy: 0.16 + rng() * 0.44,
+                    rot: 0,
+                    vr: 0,
+                    size: 0.7 + rng() * 1.8,
+                    alpha: 0.06 + rng() * 0.14,
+                    tw: rng()
+                };
+            }
+
+            if (season === 'summer') {
+                const x = rng() * w;
+                const y = 40 + rng() * (h * 0.78);
+                return {
+                    kind: 'firefly',
+                    x,
+                    y,
+                    vx: (rng() - 0.5) * 0.12,
+                    vy: -(0.03 + rng() * 0.09),
+                    rot: 0,
+                    vr: 0,
+                    size: 1.2 + rng() * 2.6,
+                    alpha: 0.10 + rng() * 0.22,
+                    tw: rng(),
+                    seed: rng()
+                };
+            }
+
+            if (season === 'autumn') {
+                const x = rng() * w;
+                const y = -30 - rng() * 60;
+                return {
+                    kind: 'leaf',
+                    x,
+                    y,
+                    vx: (rng() - 0.5) * 0.22,
+                    vy: 0.26 + rng() * 0.64,
+                    rot: (rng() - 0.5) * 1.6,
+                    vr: (rng() - 0.5) * 0.010,
+                    size: 9 + rng() * 16,
+                    alpha: 0.14 + rng() * 0.26,
+                    tw: rng(),
+                    seed: rng()
+                };
+            }
+
             const x = rng() * w;
-            const y = -20 - rng() * 40;
-            const base = {
+            const y = -30 - rng() * 60;
+            return {
+                kind: 'petal',
                 x,
                 y,
-                vx: (rng() - 0.5) * 0.18,
-                vy: 0.20 + rng() * 0.55,
-                rot: (rng() - 0.5) * 1.2,
-                vr: (rng() - 0.5) * 0.006,
-                size: 6 + rng() * 10,
-                alpha: 0.12 + rng() * 0.28,
-                tw: rng()
+                vx: (rng() - 0.5) * 0.22,
+                vy: 0.14 + rng() * 0.46,
+                rot: (rng() - 0.5) * 1.4,
+                vr: (rng() - 0.5) * 0.014,
+                size: 10 + rng() * 18,
+                alpha: 0.20 + rng() * 0.30,
+                tw: rng(),
+                seed: rng()
             };
-            if (season === 'summer') return { ...base, vy: 0.06 + rng() * 0.20, alpha: 0.10 + rng() * 0.24, size: 2 + rng() * 4 };
-            if (season === 'winter') return { ...base, vy: 0.16 + rng() * 0.46, alpha: 0.10 + rng() * 0.22, size: 1.5 + rng() * 3 };
-            if (season === 'autumn') return { ...base, vy: 0.22 + rng() * 0.70, alpha: 0.12 + rng() * 0.26, size: 7 + rng() * 12 };
-            return base;
         };
 
         const stepSeasonParticle = (season, p, dt, t, w, h) => {
-            const drift = season === 'summer'
-                ? Math.sin(t * 0.0018 + p.tw * Math.PI * 2) * 0.18
-                : season === 'autumn'
-                    ? Math.sin(t * 0.0012 + p.tw * Math.PI * 2) * 0.12
-                    : season === 'winter'
-                        ? Math.sin(t * 0.0014 + p.tw * Math.PI * 2) * 0.06
-                        : Math.sin(t * 0.0011 + p.tw * Math.PI * 2) * 0.1;
-            p.x += (p.vx + drift) * (dt / 16.67) * 10;
-            p.y += p.vy * (dt / 16.67) * 10;
-            p.rot += p.vr * (dt / 16.67) * 10;
-            if (p.y > h + 30 || p.x < -60 || p.x > w + 60) return false;
+            const k = (dt / 16.67) * 10;
+            if (p.kind === 'firefly') {
+                const s = t * 0.0013 + p.tw * Math.PI * 2;
+                const ax = Math.cos(s) * 0.18 + Math.sin(s * 1.7) * 0.10;
+                const ay = Math.sin(s * 1.3) * 0.12;
+                p.x += (p.vx + ax) * k;
+                p.y += (p.vy + ay) * k;
+                if (p.x < -60) p.x = w + 40;
+                if (p.x > w + 60) p.x = -40;
+                if (p.y < 30) p.y = 30 + (p.seed || 0) * 40;
+                if (p.y > h - 30) p.y = h - 30;
+                return true;
+            }
+            if (p.kind === 'fog') {
+                const s = t * 0.0007 + (p.seed || 0) * 10;
+                p.x += (p.vx + Math.cos(s) * 0.10) * k;
+                p.y += (p.vy + Math.sin(s * 0.7) * 0.02) * k;
+                if (p.x < -180) p.x = w + 160;
+                if (p.x > w + 180) p.x = -160;
+                if (p.y < -80) p.y = h + 60;
+                if (p.y > h + 80) p.y = -60;
+                return true;
+            }
+            if (p.kind === 'snow') {
+                const drift = Math.sin(t * 0.0011 + p.tw * Math.PI * 2) * 0.10;
+                p.x += (p.vx + drift) * k;
+                p.y += p.vy * k;
+                if (p.y > h + 30 || p.x < -80 || p.x > w + 80) return false;
+                return true;
+            }
+            if (p.kind === 'leaf') {
+                const drift = Math.sin(t * 0.0010 + p.tw * Math.PI * 2) * 0.18;
+                p.x += (p.vx + drift) * k;
+                p.y += p.vy * k;
+                p.rot += (p.vr + Math.sin(t * 0.0016 + p.tw * 8) * 0.002) * k;
+                if (p.y > h + 30 || p.x < -100 || p.x > w + 100) return false;
+                return true;
+            }
+            const drift = Math.sin(t * 0.0012 + p.tw * Math.PI * 2) * 0.14;
+            p.x += (p.vx + drift) * k;
+            p.y += p.vy * k;
+            p.rot += p.vr * k;
+            if (p.y > h + 30 || p.x < -90 || p.x > w + 90) return false;
             return true;
         };
 
-        const drawSeasonParticle = (ctx, season, p, t) => {
-            const tw = season === 'summer' ? 0.68 + 0.32 * Math.sin(t * 0.006 + p.tw * Math.PI * 2) : 1;
-            ctx.globalAlpha = p.alpha * tw;
-            if (season === 'summer') {
-                ctx.fillStyle = 'rgba(250,244,238,0.92)';
+        const drawSeasonParticle = (ctx, season, p, t, fade = 1) => {
+            if (!p) return;
+            if (p.kind === 'firefly') {
+                const f = 0.55 + 0.45 * Math.sin(t * 0.010 + p.tw * Math.PI * 2);
+                const a = p.alpha * (0.35 + f) * fade;
+                ctx.save();
+                ctx.globalAlpha = a;
+                ctx.fillStyle = 'rgba(250,244,238,0.96)';
+                ctx.shadowColor = 'rgba(250,244,238,0.70)';
+                ctx.shadowBlur = 10 + 18 * f;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * (0.9 + 0.35 * f), 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                return;
+            }
+            if (p.kind === 'fog') {
+                const drift = 0.65 + 0.35 * Math.sin(t * 0.0010 + p.tw * Math.PI * 2);
+                ctx.save();
+                ctx.globalAlpha = p.alpha * drift * fade;
+                ctx.fillStyle = 'rgba(210, 224, 235, 0.28)';
+                ctx.shadowColor = 'rgba(152,174,187,0.32)';
+                ctx.shadowBlur = 34 + 34 * drift;
+                ctx.translate(p.x, p.y);
+                ctx.rotate((p.seed || 0) * 0.4);
+                ctx.scale(1.55 + 0.25 * drift, 1);
+                ctx.beginPath();
+                ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                return;
+            }
+            if (p.kind === 'snow') {
+                ctx.save();
+                ctx.globalAlpha = p.alpha * fade;
+                ctx.fillStyle = 'rgba(250,244,238,0.78)';
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
                 ctx.fill();
+                ctx.restore();
                 return;
             }
-            if (season === 'winter') {
-                ctx.strokeStyle = 'rgba(250,244,238,0.72)';
+            if (p.kind === 'leaf') {
+                ctx.save();
+                ctx.globalAlpha = p.alpha * fade;
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rot);
+                ctx.fillStyle = 'rgba(216, 196, 146, 0.82)';
+                ctx.beginPath();
+                ctx.moveTo(0, -p.size * 0.52);
+                ctx.quadraticCurveTo(p.size * 0.55, -p.size * 0.12, 0, p.size * 0.62);
+                ctx.quadraticCurveTo(-p.size * 0.52, -p.size * 0.18, 0, -p.size * 0.52);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(120, 92, 64, 0.18)';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
-                ctx.moveTo(p.x - p.size, p.y);
-                ctx.lineTo(p.x + p.size, p.y);
+                ctx.moveTo(0, -p.size * 0.44);
+                ctx.lineTo(0, p.size * 0.46);
                 ctx.stroke();
+                ctx.restore();
                 return;
             }
-            if (season === 'autumn') {
-                ctx.fillStyle = 'rgba(208,195,168,0.88)';
-                ctx.beginPath();
-                ctx.ellipse(p.x, p.y, p.size * 0.62, p.size * 0.34, p.rot, 0, Math.PI * 2);
-                ctx.fill();
-                return;
-            }
-            ctx.fillStyle = 'rgba(168,149,184,0.82)';
+            const flip = 0.50 + 0.50 * Math.sin(t * 0.0036 + p.tw * Math.PI * 2);
+            const a = p.alpha * (0.70 + 0.30 * flip) * fade;
+            ctx.save();
+            ctx.globalAlpha = a;
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
+            ctx.fillStyle = 'rgba(234, 214, 242, 0.82)';
             ctx.beginPath();
-            ctx.ellipse(p.x, p.y, p.size * 0.62, p.size * 0.34, p.rot, 0, Math.PI * 2);
+            const w = p.size * (0.44 + 0.34 * flip);
+            const h = p.size * 0.62;
+            ctx.moveTo(0, -h);
+            ctx.quadraticCurveTo(w, -h * 0.15, 0, h);
+            ctx.quadraticCurveTo(-w, -h * 0.10, 0, -h);
             ctx.fill();
+            ctx.restore();
         };
 
         const spawnRipple = (season, x, y, t) => ({ season, x, y, t0: t, dur: 1400, seed: Math.random() });
@@ -2518,6 +2672,7 @@
             const seasonCanvasRef = React.useRef(null);
             const seasonCanvasNextRef = React.useRef(null);
             const seasonVfxRef = React.useRef(null);
+            const seasonTransitionStartRef = React.useRef(0);
             const breathProgressRef = React.useRef(null);
             const autoReadLastTickRef = React.useRef(0);
 
@@ -3131,6 +3286,7 @@
 
             React.useEffect(() => {
                 if (!isSeasonTransitioning) return;
+                seasonTransitionStartRef.current = performance.now();
                 const t = window.setTimeout(() => {
                     setActiveSeason(transitionSeason);
                     setIsSeasonTransitioning(false);
@@ -3278,21 +3434,36 @@
                     }
                 };
 
-                const getTargetCount = (season) => {
+                const getTargetCount = (season, intensity = 1) => {
                     if (!season) return 0;
-                    const base = season === 'summer' ? 70 : season === 'winter' ? 88 : season === 'autumn' ? 84 : 92;
+                    const base = season === 'summer' ? 86 : season === 'winter' ? 92 : season === 'autumn' ? 78 : 92;
                     const mult = (vfxLevel === 'low' || degraded) ? 0.45 : 1;
-                    return Math.max(0, Math.floor(base * mult));
+                    return Math.max(0, Math.floor(base * mult * Math.max(0, intensity)));
                 };
 
-                const tickLayer = (season, geom, ctx, particles, ripples, rng, dt, t) => {
+                const tickLayer = (season, geom, ctx, particles, ripples, rng, dt, t, clearZone, intensity) => {
                     if (!ctx || !season) {
                         if (ctx) ctx.clearRect(0, 0, geom.w, geom.h);
                         return { particles: [], ripples: [] };
                     }
                     ctx.clearRect(0, 0, geom.w, geom.h);
-                    const target = getTargetCount(season);
-                    while (particles.length < target) particles.push(spawnSeasonParticle(season, rng, geom.w, geom.h));
+                    const target = getTargetCount(season, intensity);
+                    const spawnOutside = () => {
+                        for (let i = 0; i < 14; i++) {
+                            const p = spawnSeasonParticle(season, rng, geom.w, geom.h);
+                            if (!p) continue;
+                            if (!clearZone || p.kind === 'fog') return p;
+                            const dx = p.x - clearZone.x;
+                            const dy = p.y - clearZone.y;
+                            if ((dx * dx + dy * dy) > (clearZone.r * clearZone.r)) return p;
+                        }
+                        return spawnSeasonParticle(season, rng, geom.w, geom.h);
+                    };
+                    while (particles.length < target) {
+                        const p = spawnOutside();
+                        if (p) particles.push(p);
+                        else break;
+                    }
                     if (particles.length > target) particles = particles.slice(0, target);
                     const nextParticles = [];
                     for (const p of particles) {
@@ -3308,7 +3479,19 @@
                             }
                         }
                         if (stepSeasonParticle(season, p, dt, t, geom.w, geom.h)) {
-                            drawSeasonParticle(ctx, season, p, t);
+                            let fade = 1;
+                            if (clearZone) {
+                                const dx = p.x - clearZone.x;
+                                const dy = p.y - clearZone.y;
+                                const d = Math.sqrt(dx * dx + dy * dy);
+                                if (d < clearZone.r) {
+                                    const edge = Math.max(1, clearZone.r * 0.26);
+                                    const base = Math.max(0, Math.min(1, (d - (clearZone.r - edge)) / edge));
+                                    if (p.kind === 'fog') fade = 0.22 + 0.78 * base;
+                                    else fade = base * base;
+                                }
+                            }
+                            drawSeasonParticle(ctx, season, p, t, fade * (intensity ?? 1));
                             nextParticles.push(p);
                         }
                     }
@@ -3331,12 +3514,35 @@
                         setVfxLevel('low');
                     }
 
-                    const a = tickLayer(activeSeason, geomA, geomA.ctx, particlesA, ripplesA, rngA, dt, t);
+                    const canvasRect = canvasA.getBoundingClientRect();
+                    const textEl = activeTextRef.current;
+                    const textRect = textEl ? textEl.getBoundingClientRect() : null;
+                    const mobile = viewportProfile?.mode === 'mobile-portrait';
+                    const clearZone = textRect ? {
+                        x: (textRect.left + textRect.right) / 2 - canvasRect.left,
+                        y: (textRect.top + textRect.bottom) / 2 - canvasRect.top,
+                        r: Math.min(340, Math.max(120, Math.max(textRect.width, textRect.height) / 2 + (mobile ? 70 : 110)))
+                    } : null;
+                    let breath = 1;
+                    if (isSeasonTransitioning) {
+                        const start = seasonTransitionStartRef.current || t;
+                        const p = Math.max(0, Math.min(1, (t - start) / 1400));
+                        if (p < 0.1429) {
+                            const u = p / 0.1429;
+                            const e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+                            breath = 1 - 0.32 * e;
+                        } else if (p > 0.7143) {
+                            const u = (p - 0.7143) / (1 - 0.7143);
+                            const e = 1 - Math.pow(1 - u, 3);
+                            breath = 0.88 + 0.18 * e;
+                        }
+                    }
+                    const a = tickLayer(activeSeason, geomA, geomA.ctx, particlesA, ripplesA, rngA, dt, t, clearZone, breath);
                     particlesA = a.particles;
                     ripplesA = a.ripples;
 
                     const seasonB = isSeasonTransitioning ? transitionSeason : null;
-                    const b = tickLayer(seasonB, geomB, geomB.ctx, particlesB, ripplesB, rngB, dt, t);
+                    const b = tickLayer(seasonB, geomB, geomB.ctx, particlesB, ripplesB, rngB, dt, t, clearZone, breath);
                     particlesB = b.particles;
                     ripplesB = b.ripples;
 
@@ -3351,7 +3557,7 @@
                     if (raf) window.cancelAnimationFrame(raf);
                     seasonVfxRef.current = null;
                 };
-            }, [activeSeason, transitionSeason, isSeasonTransitioning, reducedMotion, vfxLevel]);
+            }, [activeSeason, transitionSeason, isSeasonTransitioning, reducedMotion, vfxLevel, viewportProfile]);
 
             React.useEffect(() => {
                 if (!tracks.length && currentTrackIndex !== -1) {
