@@ -2188,7 +2188,7 @@
                         // 拖拽时：停止随机漂移，置顶，变清晰，放大
                         gsap.killTweensOf(el);
                         gsap.to(el, {
-                            scale: 1.1,
+                            scale: 1.06,
                             opacity: 1,
                             filter: 'blur(0px)',
                             zIndex: 1000,
@@ -2225,7 +2225,7 @@
                 const onMouseEnter = () => {
                     if (Draggable.get(el) && Draggable.get(el).isDragging) return;
                     gsap.to(el, {
-                        scale: isFocused ? 1.08 : 1.05,
+                        scale: isFocused ? 1.05 : 1.03,
                         opacity: isFocused ? 1 : 0.9,
                         filter: 'blur(0px)',
                         zIndex: isFocused ? 950 : 100,
@@ -2238,7 +2238,7 @@
                     if (Draggable.get(el) && Draggable.get(el).isDragging) return;
                     if (isFocused) {
                         gsap.to(el, {
-                            scale: 1.06,
+                            scale: 1.04,
                             opacity: 0.96,
                             filter: 'blur(0px)',
                             zIndex: 950,
@@ -2301,7 +2301,7 @@
                         {
                             x: window.innerWidth / 2 - 150,
                             y: window.innerHeight / 2 - 50,
-                            scale: 1.5,
+                            scale: 1.15,
                             opacity: 1,
                             rotation: 0,
                             filter: 'blur(0px)'
@@ -2310,10 +2310,10 @@
                             x: initialPos.x,
                             y: initialPos.y,
                             scale: 1,
-                            opacity: 0.15,
+                            opacity: 0.2,
                             rotation: initialPos.rot,
                             filter: 'blur(2px)',
-                            duration: 3,
+                            duration: 1.9,
                             ease: "power3.out"
                         }
                     );
@@ -2335,7 +2335,7 @@
                 if (isFocused) {
                     gsap.killTweensOf(el);
                     gsap.to(el, {
-                        scale: 1.06,
+                        scale: 1.04,
                         opacity: 0.96,
                         filter: 'blur(0px)',
                         zIndex: 950,
@@ -2345,7 +2345,7 @@
                 } else {
                     gsap.to(el, {
                         scale: 1,
-                        opacity: 0.2,
+                        opacity: 0.24,
                         filter: 'blur(2px)',
                         zIndex: 20,
                         duration: 0.8,
@@ -3998,6 +3998,19 @@
             const visibleNotes = arrangeMode ? arrangedNotes : droppedNotes;
             const showArrangeTools = uiProfile === 'classic' || arrangePanelOpen;
 
+            const handleArrangeToggle = () => {
+                if (mode !== 'editing') {
+                    setMode('editing');
+                    window.setTimeout(() => {
+                        if (arrangeMode) exitArrangeMode();
+                        else arrangeNotes();
+                    }, 0);
+                    return;
+                }
+                if (arrangeMode) exitArrangeMode();
+                else arrangeNotes();
+            };
+
             const exitArrangeMode = () => {
                 setArrangeMode(false);
                 setArrangeSearch('');
@@ -4340,11 +4353,9 @@
                         {arrangeMode && mode === 'editing' && (
                             <div className="soft-icon-btn label-btn" title="当前层">{`${currentArrangeGroup?.label || '全部'} ${arrangeGroupPageIndex + 1}/${totalLayers}`}</div>
                         )}
-                        {mode === 'editing' && (
-                            <button type="button" className="soft-icon-btn label-btn" title={arrangeMode ? "退出整理" : "整理便签"} onClick={arrangeMode ? exitArrangeMode : arrangeNotes}>
-                                {arrangeMode ? '退出整理' : '整理'}
-                            </button>
-                        )}
+                        <button type="button" className="soft-icon-btn label-btn" title={arrangeMode ? "退出整理" : "整理便签"} onClick={handleArrangeToggle}>
+                            {arrangeMode ? '退出整理' : '整理'}
+                        </button>
                         {mode === 'editing' && (
                             <button type="button" className="soft-icon-btn label-btn" title="撤销" onClick={undo}>撤销</button>
                         )}
