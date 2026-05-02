@@ -204,6 +204,8 @@
             font-size: 1.1rem;
             line-height: 1.6;
             cursor: grab;
+            user-select: none;
+            -webkit-user-select: none;
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             word-wrap: break-word;
@@ -1530,7 +1532,7 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 52;
-            width: 160px;
+            width: 140px;
             height: 18px;
             opacity: 0;
             pointer-events: none;
@@ -3064,7 +3066,6 @@
                 const timer = window.setInterval(() => {
                     if (!isAnimating) {
                         handleNext();
-                        autoReadLastTickRef.current = performance.now();
                     }
                 }, AUTO_READ_INTERVAL_MS);
                 return () => window.clearInterval(timer);
@@ -3175,7 +3176,12 @@
                     const now = performance.now();
                     const elapsed = now - autoReadLastTickRef.current;
                     const p = Math.max(0, Math.min(1, elapsed / AUTO_READ_INTERVAL_MS));
-                    const x = 10 + p * (160 - 16);
+                    const rect = el.getBoundingClientRect();
+                    const w = Math.max(80, rect.width || 140);
+                    const leftPad = 10;
+                    const rightPad = 16;
+                    const maxX = Math.max(leftPad, w - rightPad);
+                    const x = leftPad + p * (maxX - leftPad);
                     el.style.setProperty('--breath-dot-x', `${x.toFixed(1)}px`);
                     raf = window.requestAnimationFrame(loop);
                 };
@@ -3408,6 +3414,7 @@
                             onComplete: () => {
                                 setIsAnimating(false);
                                 wheelAcc.current = 0; // 重置滚轮累计
+                                autoReadLastTickRef.current = performance.now();
                             }
                         });
                     }
@@ -4027,9 +4034,9 @@
                 return lines[currentIndex % lines.length];
             }, [currentIndex, chapterInfo]);
 
-            const toggleNoteFocus = (noteId) => {
+            const toggleNoteFocus = React.useCallback((noteId) => {
                 setFocusedNoteId(prev => prev === noteId ? null : noteId);
-            };
+            }, []);
 
             const visibleNotes = arrangeMode ? arrangedNotes : droppedNotes;
             const showArrangeTools = uiProfile === 'classic' || arrangePanelOpen;
@@ -4217,7 +4224,7 @@
                                     <span></span>
                                 </div>
                                 <div className="music-time">{formatTime(currentTime)} / {formatTime(audioRef.current?.duration || 0)}</div>
-                                <div className="music-tip">{isPlaying ? `播放中 ${Math.round(audioEnergy * 100)}%` : '静置中'}</div>
+                                <div className="music-tip">{isPlaying ? `播放进度 ${Math.round(progress)}%` : '静置中'}</div>
                             </div>
                             <div className="music-toolbar">
                                 <div className="music-toolbar-left">
