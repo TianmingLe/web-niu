@@ -1712,6 +1712,10 @@
         }
 
         @media (max-width: 820px) {
+            .main-stage.viewport-mobile {
+                --mobile-controls-h: 76px;
+            }
+
             .active-text-container {
                 width: calc(100vw - 40px);
                 max-width: none;
@@ -1749,20 +1753,27 @@
                 max-height: 56px;
             }
 
-            .music-dock {
+            .main-stage.viewport-mobile .music-dock {
                 left: 16px;
-                right: 16px;
-                bottom: 86px;
+                right: auto;
+                bottom: calc(var(--mobile-controls-h, 76px) + 14px);
                 min-width: 0;
-                width: calc(100vw - 32px);
-                max-width: none;
-                padding: 12px 14px;
+                width: fit-content;
+                max-width: min(260px, 56vw);
+                padding: 12px 12px;
             }
 
-            .music-dock.collapsed {
+            .main-stage.viewport-mobile .music-dock.expanded {
+                left: 16px;
+                right: 16px;
                 width: calc(100vw - 32px);
-                min-width: 0;
                 max-width: none;
+            }
+
+            .main-stage.viewport-mobile .music-dock.collapsed {
+                width: fit-content;
+                min-width: 0;
+                max-width: min(260px, 56vw);
                 max-height: 76px;
                 border-radius: 20px;
             }
@@ -1800,11 +1811,52 @@
             .controls {
                 right: 16px;
                 left: 16px;
-                bottom: 18px;
+                bottom: calc(12px + env(safe-area-inset-bottom));
                 display: grid;
                 grid-template-columns: repeat(3, minmax(0, 1fr));
                 gap: 10px;
                 justify-content: stretch;
+            }
+
+            .main-stage.viewport-mobile .bottom-center-stack {
+                bottom: calc(var(--mobile-controls-h, 76px) + 14px);
+            }
+
+            .main-stage.viewport-mobile.mobile-dock-expanded .controls {
+                opacity: 0;
+                pointer-events: none;
+                transform: translateY(10px);
+            }
+
+            .main-stage.viewport-mobile.mobile-dock-expanded .bottom-center-stack {
+                opacity: 0;
+                pointer-events: none;
+                filter: blur(6px);
+            }
+
+            .main-stage.viewport-mobile.mobile-onboarding .music-dock,
+            .main-stage.viewport-mobile.mobile-onboarding .bottom-center-stack,
+            .main-stage.viewport-mobile.mobile-onboarding .controls {
+                transition: opacity 0.6s ease, transform 0.6s ease, box-shadow 0.6s ease, filter 0.6s ease;
+            }
+
+            .main-stage.viewport-mobile .music-dock.onboard-focus {
+                box-shadow: 0 18px 60px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(244, 240, 235, 0.12);
+                filter: saturate(1.06);
+            }
+
+            .main-stage.viewport-mobile .bottom-center-stack.onboard-focus {
+                filter: drop-shadow(0 18px 50px rgba(0, 0, 0, 0.28));
+            }
+
+            .main-stage.viewport-mobile .controls.onboard-focus {
+                transform: translateY(-2px) scale(1.02);
+                filter: saturate(1.06);
+            }
+
+            .main-stage.viewport-mobile .controls.onboard-expanded .soft-icon-btn {
+                height: 56px;
+                font-size: 19px;
             }
 
             .arrange-search-wrap {
@@ -2243,7 +2295,8 @@
             tagPalette: 'ambient-dream-tags-palette',
             directoryViewMode: 'ambient-dream-directory-view-mode',
             appBackupVersion: 'ambient-dream-backup-version',
-            uiProfile: 'ambient-dream-ui-profile'
+            uiProfile: 'ambient-dream-ui-profile',
+            mobileOnboarding: 'ambient-dream-mobile-onboarding-v1'
         };
 
         const safeReadStorage = (key, fallback) => {
@@ -2653,8 +2706,13 @@
             const [arrangePanelOpen, setArrangePanelOpen] = React.useState(false);
             const [viewportProfile, setViewportProfile] = React.useState(() => getViewportProfile());
             const [toasts, setToasts] = React.useState([]);
+            const [mobileControlsHeight, setMobileControlsHeight] = React.useState(76);
+            const [mobileOnboardingPhase, setMobileOnboardingPhase] = React.useState(null);
 
             const reducedMotion = useReducedMotion();
+            const isMobile = viewportProfile.width <= 820;
+            const isMobilePortrait = isMobile && viewportProfile.height > viewportProfile.width;
+            const mobileDockExpanded = isMobile && (musicDockOpen || musicDockPinned);
             
             const activeTextRef = React.useRef(null);
             const wheelAcc = React.useRef(0);
@@ -2685,6 +2743,11 @@
             const seasonTransitionStartRef = React.useRef(0);
             const breathProgressRef = React.useRef(null);
             const autoReadLastTickRef = React.useRef(0);
+            const controlsRef = React.useRef(null);
+            const mobileControlsHeightRef = React.useRef(76);
+            const mobileOnboardingSeenRef = React.useRef(safeReadStorage(STORAGE_KEYS.mobileOnboarding, false) === true);
+            const mobileOnboardingTimersRef = React.useRef([]);
+            const mobileOnboardingStopQueuedRef = React.useRef(false);
 
             const pushToast = React.useCallback((message) => {
                 const id = ++toastIdRef.current;
@@ -2699,6 +2762,104 @@
                 if (!ok) pushToast('存储失败：可能空间不足或被浏览器限制');
                 return ok;
             }, [pushToast]);
+
+            const stopMobileOnboarding = React.useCallback(() => {
+                mobileOnboardingTimersRef.current.forEach(t => window.clearTimeout(t));
+                mobileOnboardingTimersRef.current = [];
+                if (!mobileOnboardingSeenRef.current) {
+                    mobileOnboardingSeenRef.current = true;
+                    safeWriteStorage(STORAGE_KEYS.mobileOnboarding, true);
+                }
+                setMobileOnboardingPhase(null);
+            }, []);
+
+            React.useEffect(() => {
+                mobileControlsHeightRef.current = mobileControlsHeight;
+            }, [mobileControlsHeight]);
+
+            React.useEffect(() => {
+                if (!isMobile) return;
+                const el = controlsRef.current;
+                if (!el) return;
+                let raf = 0;
+                const update = () => {
+                    window.cancelAnimationFrame(raf);
+                    raf = window.requestAnimationFrame(() => {
+                        const h = el.getBoundingClientRect?.().height || 0;
+                        if (!h) return;
+                        if (Math.abs(h - mobileControlsHeightRef.current) < 0.5) return;
+                        setMobileControlsHeight(h);
+                    });
+                };
+                update();
+                let ro = null;
+                if (window.ResizeObserver) {
+                    ro = new ResizeObserver(update);
+                    ro.observe(el);
+                }
+                window.addEventListener('resize', update, { passive: true });
+                return () => {
+                    window.removeEventListener('resize', update);
+                    ro && ro.disconnect();
+                    window.cancelAnimationFrame(raf);
+                };
+            }, [isMobile]);
+
+            React.useEffect(() => {
+                if (!isMobile) return;
+                if (reducedMotion) return;
+                if (mobileOnboardingSeenRef.current) return;
+                if (mobileOnboardingPhase != null) return;
+                const t = window.setTimeout(() => {
+                    if (mobileOnboardingSeenRef.current) return;
+                    setMobileOnboardingPhase('music');
+                }, 650);
+                return () => window.clearTimeout(t);
+            }, [isMobile, reducedMotion, mobileOnboardingPhase]);
+
+            React.useEffect(() => {
+                if (!isMobile) return;
+                if (!mobileOnboardingPhase) return;
+                mobileOnboardingTimersRef.current.forEach(t => window.clearTimeout(t));
+                mobileOnboardingTimersRef.current = [];
+                const schedule = (fn, ms) => {
+                    const t = window.setTimeout(fn, ms);
+                    mobileOnboardingTimersRef.current.push(t);
+                };
+                if (mobileOnboardingPhase === 'music') schedule(() => setMobileOnboardingPhase('scroll'), 920);
+                else if (mobileOnboardingPhase === 'scroll') schedule(() => setMobileOnboardingPhase('controls'), 920);
+                else if (mobileOnboardingPhase === 'controls') schedule(() => stopMobileOnboarding(), 920);
+            }, [isMobile, mobileOnboardingPhase, stopMobileOnboarding]);
+
+            React.useEffect(() => {
+                if (!isMobile) return;
+                if (!mobileOnboardingPhase) return;
+                const requestStop = () => {
+                    if (mobileOnboardingStopQueuedRef.current) return;
+                    mobileOnboardingStopQueuedRef.current = true;
+                    window.setTimeout(() => {
+                        mobileOnboardingStopQueuedRef.current = false;
+                        stopMobileOnboarding();
+                    }, 0);
+                };
+                const opts = { capture: true, passive: true };
+                window.addEventListener('pointerdown', requestStop, opts);
+                window.addEventListener('wheel', requestStop, opts);
+                window.addEventListener('touchmove', requestStop, opts);
+                window.addEventListener('keydown', requestStop, true);
+                return () => {
+                    window.removeEventListener('pointerdown', requestStop, opts);
+                    window.removeEventListener('wheel', requestStop, opts);
+                    window.removeEventListener('touchmove', requestStop, opts);
+                    window.removeEventListener('keydown', requestStop, true);
+                };
+            }, [isMobile, mobileOnboardingPhase, stopMobileOnboarding]);
+
+            React.useEffect(() => {
+                if (!reducedMotion) return;
+                if (!mobileOnboardingPhase) return;
+                stopMobileOnboarding();
+            }, [reducedMotion, mobileOnboardingPhase, stopMobileOnboarding]);
 
             const arrangeMetrics = React.useMemo(() => {
                 const width = viewportProfile.width;
@@ -4642,8 +4803,22 @@
                 setDroppedNotes(prev => prev.map(note => note.id === noteId ? { ...note, pos: { ...note.pos, ...pos } } : note));
             }, [pushHistory]);
 
+            const mobileOnboardingActive = isMobile && mobileOnboardingPhase != null;
+            const mainStageClassName = [
+                'main-stage',
+                `viewport-${viewportProfile.mode}`,
+                `mode-${mode}`,
+                `ui-${uiProfile}`,
+                `season-${(isSeasonTransitioning ? transitionSeason : activeSeason) || 'base'}`,
+                isMobile ? 'viewport-mobile' : '',
+                isMobilePortrait ? 'viewport-mobile-portrait' : '',
+                mobileDockExpanded ? 'mobile-dock-expanded' : '',
+                mobileOnboardingActive ? `mobile-onboarding onboard-${mobileOnboardingPhase}` : ''
+            ].filter(Boolean).join(' ');
+            const mainStageStyle = isMobile ? { '--mobile-controls-h': `${mobileControlsHeight}px` } : undefined;
+
             return (
-                <div className={`main-stage viewport-${viewportProfile.mode} mode-${mode} ui-${uiProfile} season-${(isSeasonTransitioning ? transitionSeason : activeSeason) || 'base'}`}>
+                <div className={mainStageClassName} style={mainStageStyle}>
                     <AmbientBackground bgRef={ambientBgRef} />
                     <div ref={seasonStageRef} className={`season-stage ${(activeSeason != null || transitionSeason != null) ? 'active' : ''}`} aria-hidden="true">
                         <div className={`season-layer season-layer-far season-far ${activeSeason || ''} ${(activeSeason && !isSeasonTransitioning) ? 'is-active' : ''}`}></div>
@@ -4684,7 +4859,7 @@
                         </div>
                     </div>
 
-                    <div className="bottom-center-stack">
+                    <div className={`bottom-center-stack ${mobileOnboardingPhase === 'scroll' ? 'onboard-focus' : ''}`}>
                         <div ref={breathProgressRef} className={`breath-progress ${(isAutoReading && !isUserInteracting) ? 'visible' : ''}`} aria-hidden="true">
                             <div className="breath-line"></div>
                             <div className="breath-dot"></div>
@@ -4713,7 +4888,7 @@
                     </div>
 
                     <div
-                        className={`music-dock ${(musicDockOpen || musicDockPinned) ? 'expanded' : 'collapsed'}`}
+                        className={`music-dock ${(musicDockOpen || musicDockPinned) ? 'expanded' : 'collapsed'} ${mobileOnboardingPhase === 'music' ? 'onboard-focus' : ''}`}
                         onMouseEnter={() => setMusicDockOpen(true)}
                         onMouseLeave={() => !musicDockPinned && setMusicDockOpen(false)}
                     >
@@ -4835,152 +5010,173 @@
                         </div>
                     </div>
 
-                    <div className={`controls ${mode === 'reading' ? 'compact' : ''}`}>
-                        <button type="button" className="soft-icon-btn" title="收藏当前句子" onClick={addFavorite}>♥</button>
-                        <button type="button" className="soft-icon-btn label-btn" title="语录目录" onClick={() => {
-                            setIsModalOpen(false);
-                            setIsDirectoryOpen(true);
-                        }}>目录</button>
-                        <button type="button" className="soft-icon-btn label-btn" title="自动阅读" onClick={() => setIsAutoReading(prev => !prev)}>
-                            {isAutoReading ? '停读' : '自读'}
-                        </button>
-                        {arrangeMode && mode === 'editing' && uiProfile === 'refined' && (
-                            <button
-                                type="button"
-                                className={`music-mini-btn ${arrangePanelOpen ? 'active' : ''}`}
-                                onClick={() => setArrangePanelOpen(prev => !prev)}
-                                title="展开/收起整理面板"
-                            >
-                                面板
+                    {isMobile ? (
+                        <div
+                            ref={controlsRef}
+                            className={`controls mobile-controls ${mode === 'reading' ? 'compact' : ''} ${mobileOnboardingPhase === 'controls' ? 'onboard-focus onboard-expanded' : ''}`}
+                        >
+                            <button type="button" className="soft-icon-btn" title="收藏当前句子" onClick={addFavorite}>♥</button>
+                            <button type="button" className="soft-icon-btn" title="语录目录" onClick={() => {
+                                setIsModalOpen(false);
+                                setIsDirectoryOpen(true);
+                            }}>≡</button>
+                            <button type="button" className="soft-icon-btn" title={isPlaying ? '暂停' : '播放'} onClick={() => {
+                                if (!tracks.length) {
+                                    pushToast('还没有音乐');
+                                    setMusicDockOpen(true);
+                                    return;
+                                }
+                                togglePlayback();
+                            }}>{isPlaying ? '❚❚' : '▶'}</button>
+                        </div>
+                    ) : (
+                        <div className={`controls ${mode === 'reading' ? 'compact' : ''}`}>
+                            <button type="button" className="soft-icon-btn" title="收藏当前句子" onClick={addFavorite}>♥</button>
+                            <button type="button" className="soft-icon-btn label-btn" title="语录目录" onClick={() => {
+                                setIsModalOpen(false);
+                                setIsDirectoryOpen(true);
+                            }}>目录</button>
+                            <button type="button" className="soft-icon-btn label-btn" title="自动阅读" onClick={() => setIsAutoReading(prev => !prev)}>
+                                {isAutoReading ? '停读' : '自读'}
                             </button>
-                        )}
-                        {arrangeMode && mode === 'editing' && showArrangeTools && (
-                            <div className="arrange-groups-wrap">
+                            {arrangeMode && mode === 'editing' && uiProfile === 'refined' && (
                                 <button
                                     type="button"
-                                    className={`music-mini-btn ${groupingEnabled ? 'active' : ''}`}
-                                    onClick={() => setGroupingEnabled(prev => !prev)}
+                                    className={`music-mini-btn ${arrangePanelOpen ? 'active' : ''}`}
+                                    onClick={() => setArrangePanelOpen(prev => !prev)}
+                                    title="展开/收起整理面板"
                                 >
-                                    分组
+                                    面板
                                 </button>
-                                {groupingEnabled && arrangeGroups.map(g => (
+                            )}
+                            {arrangeMode && mode === 'editing' && showArrangeTools && (
+                                <div className="arrange-groups-wrap">
                                     <button
-                                        key={g.key || 'all'}
                                         type="button"
-                                        className={`music-mini-btn arrange-group-btn ${(currentArrangeGroup?.key ?? null) === (g.key ?? null) ? 'active' : ''}`}
-                                        onClick={() => {
-                                            setArrangeGroupKey(g.key);
-                                            setArrangeGroupPageIndex(0);
-                                        }}
+                                        className={`music-mini-btn ${groupingEnabled ? 'active' : ''}`}
+                                        onClick={() => setGroupingEnabled(prev => !prev)}
                                     >
-                                        {!!g.color && <span className="tag-dot" style={{ backgroundColor: g.color }}></span>}
-                                        <span>{g.label}</span>
-                                        <span className="arrange-search-meta">{g.noteIds.length}</span>
+                                        分组
                                     </button>
-                                ))}
-                            </div>
-                        )}
-                        {arrangeMode && mode === 'editing' && showArrangeTools && (
-                            <div className="arrange-filter-wrap">
-                                {(tagPalette || []).slice(0, 10).map(t => {
-                                    const key = String(t?.name || '').trim().toLowerCase();
-                                    if (!key) return null;
-                                    const active = selectedTagSet.has(key);
-                                    return (
+                                    {groupingEnabled && arrangeGroups.map(g => (
                                         <button
-                                            key={key}
+                                            key={g.key || 'all'}
                                             type="button"
-                                            className={`music-mini-btn arrange-group-btn ${active ? 'active' : ''}`}
+                                            className={`music-mini-btn arrange-group-btn ${(currentArrangeGroup?.key ?? null) === (g.key ?? null) ? 'active' : ''}`}
                                             onClick={() => {
-                                                setSelectedTags(prev => {
-                                                    const set = new Set((Array.isArray(prev) ? prev : []).map(x => String(x || '').trim().toLowerCase()).filter(Boolean));
-                                                    if (set.has(key)) set.delete(key);
-                                                    else set.add(key);
-                                                    return Array.from(set);
-                                                });
+                                                setArrangeGroupKey(g.key);
                                                 setArrangeGroupPageIndex(0);
                                             }}
                                         >
-                                            {!!t.color && <span className="tag-dot" style={{ backgroundColor: t.color }}></span>}
-                                            <span>{t.name}</span>
+                                            {!!g.color && <span className="tag-dot" style={{ backgroundColor: g.color }}></span>}
+                                            <span>{g.label}</span>
+                                            <span className="arrange-search-meta">{g.noteIds.length}</span>
                                         </button>
-                                    );
-                                })}
-                                <button
-                                    type="button"
-                                    className={`music-mini-btn ${includeUntagged ? 'active' : ''}`}
-                                    onClick={() => {
-                                        setIncludeUntagged(prev => !prev);
-                                        setArrangeGroupPageIndex(0);
-                                    }}
-                                >
-                                    未分类
-                                </button>
-                                <button
-                                    type="button"
-                                    className="music-mini-btn"
-                                    onClick={() => {
-                                        setSelectedTags([]);
-                                        setIncludeUntagged(true);
-                                        setArrangeSearch('');
-                                        setArrangeGroupPageIndex(0);
-                                    }}
-                                >
-                                    清空
-                                </button>
-                            </div>
-                        )}
-                        {arrangeMode && mode === 'editing' && showArrangeTools && (
-                            <div className="arrange-search-wrap">
-                                <input
-                                    className="arrange-search-input"
-                                    value={arrangeSearch}
-                                    onChange={(e) => setArrangeSearch(e.target.value)}
-                                    placeholder="搜索便签内容…"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            locateNextMatch();
-                                        }
-                                    }}
-                                />
-                                <button type="button" className="music-mini-btn" onClick={locatePrevMatch}>上一个</button>
-                                <button type="button" className="music-mini-btn" onClick={locateNextMatch}>下一个</button>
-                                <div className="arrange-search-meta">
-                                    {String(arrangeSearch || '').trim()
-                                        ? (arrangeMatches.length ? `${arrangeMatches.length}处` : '无匹配')
-                                        : ''}
+                                    ))}
                                 </div>
-                            </div>
-                        )}
-                        {arrangeMode && mode === 'editing' && (
-                            <button type="button" className="soft-icon-btn label-btn" title="上一层" onClick={prevArrangeLayer}>上一层</button>
-                        )}
-                        {arrangeMode && mode === 'editing' && (
-                            <button type="button" className="soft-icon-btn label-btn" title="下一层" onClick={nextArrangeLayer}>下一层</button>
-                        )}
-                        {arrangeMode && mode === 'editing' && (
-                            <div className="soft-icon-btn label-btn" title="当前层">{`${currentArrangeGroup?.label || '全部'} ${arrangeGroupPageIndex + 1}/${totalLayers}`}</div>
-                        )}
-                        <button type="button" className="soft-icon-btn label-btn" title={arrangeMode ? "退出整理" : "整理便签"} onClick={handleArrangeToggle}>
-                            {arrangeMode ? '退出整理' : '整理'}
-                        </button>
-                        {mode === 'editing' && (
-                            <button type="button" className="soft-icon-btn label-btn" title="撤销" onClick={undo}>撤销</button>
-                        )}
-                        {mode === 'editing' && focusedNoteId != null && (
-                            <button type="button" className="soft-icon-btn label-btn" title="编辑标签" onClick={() => setIsTagEditorOpen(true)}>标签</button>
-                        )}
-                        {mode === 'editing' && (
-                            <button type="button" className="soft-icon-btn label-btn" title="清空便签" onClick={clearAllNotes}>清空</button>
-                        )}
-                        {mode === 'editing' && (
-                            <button type="button" className="add-btn" onClick={() => {
-                                setIsDirectoryOpen(false);
-                                setIsModalOpen(true);
-                            }}>+</button>
-                        )}
-                    </div>
+                            )}
+                            {arrangeMode && mode === 'editing' && showArrangeTools && (
+                                <div className="arrange-filter-wrap">
+                                    {(tagPalette || []).slice(0, 10).map(t => {
+                                        const key = String(t?.name || '').trim().toLowerCase();
+                                        if (!key) return null;
+                                        const active = selectedTagSet.has(key);
+                                        return (
+                                            <button
+                                                key={key}
+                                                type="button"
+                                                className={`music-mini-btn arrange-group-btn ${active ? 'active' : ''}`}
+                                                onClick={() => {
+                                                    setSelectedTags(prev => {
+                                                        const set = new Set((Array.isArray(prev) ? prev : []).map(x => String(x || '').trim().toLowerCase()).filter(Boolean));
+                                                        if (set.has(key)) set.delete(key);
+                                                        else set.add(key);
+                                                        return Array.from(set);
+                                                    });
+                                                    setArrangeGroupPageIndex(0);
+                                                }}
+                                            >
+                                                {!!t.color && <span className="tag-dot" style={{ backgroundColor: t.color }}></span>}
+                                                <span>{t.name}</span>
+                                            </button>
+                                        );
+                                    })}
+                                    <button
+                                        type="button"
+                                        className={`music-mini-btn ${includeUntagged ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setIncludeUntagged(prev => !prev);
+                                            setArrangeGroupPageIndex(0);
+                                        }}
+                                    >
+                                        未分类
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="music-mini-btn"
+                                        onClick={() => {
+                                            setSelectedTags([]);
+                                            setIncludeUntagged(true);
+                                            setArrangeSearch('');
+                                            setArrangeGroupPageIndex(0);
+                                        }}
+                                    >
+                                        清空
+                                    </button>
+                                </div>
+                            )}
+                            {arrangeMode && mode === 'editing' && showArrangeTools && (
+                                <div className="arrange-search-wrap">
+                                    <input
+                                        className="arrange-search-input"
+                                        value={arrangeSearch}
+                                        onChange={(e) => setArrangeSearch(e.target.value)}
+                                        placeholder="搜索便签内容…"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                locateNextMatch();
+                                            }
+                                        }}
+                                    />
+                                    <button type="button" className="music-mini-btn" onClick={locatePrevMatch}>上一个</button>
+                                    <button type="button" className="music-mini-btn" onClick={locateNextMatch}>下一个</button>
+                                    <div className="arrange-search-meta">
+                                        {String(arrangeSearch || '').trim()
+                                            ? (arrangeMatches.length ? `${arrangeMatches.length}处` : '无匹配')
+                                            : ''}
+                                    </div>
+                                </div>
+                            )}
+                            {arrangeMode && mode === 'editing' && (
+                                <button type="button" className="soft-icon-btn label-btn" title="上一层" onClick={prevArrangeLayer}>上一层</button>
+                            )}
+                            {arrangeMode && mode === 'editing' && (
+                                <button type="button" className="soft-icon-btn label-btn" title="下一层" onClick={nextArrangeLayer}>下一层</button>
+                            )}
+                            {arrangeMode && mode === 'editing' && (
+                                <div className="soft-icon-btn label-btn" title="当前层">{`${currentArrangeGroup?.label || '全部'} ${arrangeGroupPageIndex + 1}/${totalLayers}`}</div>
+                            )}
+                            <button type="button" className="soft-icon-btn label-btn" title={arrangeMode ? "退出整理" : "整理便签"} onClick={handleArrangeToggle}>
+                                {arrangeMode ? '退出整理' : '整理'}
+                            </button>
+                            {mode === 'editing' && (
+                                <button type="button" className="soft-icon-btn label-btn" title="撤销" onClick={undo}>撤销</button>
+                            )}
+                            {mode === 'editing' && focusedNoteId != null && (
+                                <button type="button" className="soft-icon-btn label-btn" title="编辑标签" onClick={() => setIsTagEditorOpen(true)}>标签</button>
+                            )}
+                            {mode === 'editing' && (
+                                <button type="button" className="soft-icon-btn label-btn" title="清空便签" onClick={clearAllNotes}>清空</button>
+                            )}
+                            {mode === 'editing' && (
+                                <button type="button" className="add-btn" onClick={() => {
+                                    setIsDirectoryOpen(false);
+                                    setIsModalOpen(true);
+                                }}>+</button>
+                            )}
+                        </div>
+                    )}
 
                     <div className="chapter-badge">
                         <div className="stage-name">{chapterInfo.stage}</div>
