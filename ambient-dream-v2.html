@@ -12,6 +12,7 @@
     <!-- 引入 GSAP 和 Draggable -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/Draggable.min.js"></script>
+    <script src="ambient-dream-utils.js"></script>
 
     <style>
         :root {
@@ -3648,18 +3649,63 @@
                 });
             }, [isAnimating, comments, currentIndex]);
 
+            const handlePrev = React.useCallback(() => {
+                if (isAnimating || comments.length === 0) return;
+                setIsAnimating(true);
+
+                gsap.to(activeTextRef.current, {
+                    opacity: 0,
+                    y: 40,
+                    scale: 1.06,
+                    filter: 'blur(10px)',
+                    duration: 1.3,
+                    ease: "power2.inOut",
+                    onComplete: () => {
+                        const prevIdx = (currentIndex - 1 + comments.length) % comments.length;
+                        setCurrentIndex(prevIdx);
+
+                        gsap.set(activeTextRef.current, {
+                            y: -40,
+                            scale: 0.92,
+                            filter: 'blur(10px)'
+                        });
+
+                        gsap.to(activeTextRef.current, {
+                            opacity: 1,
+                            y: 0,
+                            scale: 1,
+                            filter: 'blur(0px)',
+                            duration: 1.8,
+                            ease: "power3.out",
+                            delay: 0.35,
+                            onComplete: () => {
+                                setIsAnimating(false);
+                                wheelAcc.current = 0;
+                                autoReadLastTickRef.current = performance.now();
+                            }
+                        });
+                    }
+                });
+            }, [isAnimating, comments, currentIndex]);
+
             // 监听全局滚轮和触摸滑动
             React.useEffect(() => {
                 const handleWheel = (e) => {
                     if (isAnimating || isModalOpen || isDirectoryOpen) return;
                     e.preventDefault();
-                    
-                    if (e.deltaY > 0) {
-                        wheelAcc.current += e.deltaY;
-                        if (wheelAcc.current > 300) { // 阈值
-                            handleNext();
-                        }
+
+                    const fn = window.AmbientDreamUtils?.accumulateWheelNavigation;
+                    if (typeof fn === 'function') {
+                        const next = fn({ acc: wheelAcc.current, deltaY: e.deltaY, threshold: 300 });
+                        wheelAcc.current = next.acc;
+                        if (next.action === 'next') handleNext();
+                        if (next.action === 'prev') handlePrev();
+                        return;
                     }
+
+                    wheelAcc.current += e.deltaY;
+                    if (wheelAcc.current > 300) handleNext();
+                    if (wheelAcc.current < -300) handlePrev();
                 };
 
                 let touchStartY = 0;
@@ -3673,6 +3719,11 @@
                     if (deltaY > 60) {
                         handleNext();
                         touchStartY = e.touches[0].clientY;
+                        return;
+                    }
+                    if (deltaY < -60) {
+                        handlePrev();
+                        touchStartY = e.touches[0].clientY;
                     }
                 };
 
@@ -3685,7 +3736,7 @@
                     window.removeEventListener('touchstart', handleTouchStart);
                     window.removeEventListener('touchmove', handleTouchMove);
                 };
-            }, [isAnimating, isModalOpen, isDirectoryOpen, currentIndex, comments.length]);
+            }, [isAnimating, isModalOpen, isDirectoryOpen, currentIndex, comments.length, handleNext, handlePrev]);
 
             const upsertPalette = React.useCallback((name, color) => {
                 const normalized = normalizeTagName(name);
@@ -3780,6 +3831,14 @@
                 const gapY = arrangeMetrics.gapY;
                 const topOffset = arrangeMetrics.topOffset;
                 const cardHeight = arrangeMetrics.cardHeight;
+                const xStart = (() => {
+                    const fn = window.AmbientDreamUtils?.getArrangeXStart;
+                    if (typeof fn === 'function') {
+                        return fn({ viewportWidth: viewportProfile.width, cols, cardWidth, gapX, margin: 18 });
+                    }
+                    const gridWidth = cols * cardWidth + (cols - 1) * gapX;
+                    return Math.max(18, Math.round((viewportProfile.width - gridWidth) / 2));
+                })();
                 setFocusedNoteId(null);
                 setArrangeMode(true);
                 setArrangeGroupKey(null);
@@ -3791,7 +3850,7 @@
                     return {
                         ...note,
                         pos: {
-                            x: 18 + col * (cardWidth + gapX),
+                            x: xStart + col * (cardWidth + gapX),
                             y: topOffset + row * (cardHeight + gapY),
                             rot: (col - 1) * 2
                         }
@@ -4293,6 +4352,33 @@
             const visibleNotes = arrangeMode ? arrangedNotes : droppedNotes;
             const showArrangeTools = uiProfile === 'classic' || arrangePanelOpen;
 
+            const arrangeLayout = React.useMemo(() => {
+                if (!arrangeMode) return null;
+                const cols = arrangeMetrics.cols;
+                const cardWidth = arrangeMetrics.cardWidth;
+                const gapX = arrangeMetrics.gapX;
+                const gapY = arrangeMetrics.gapY;
+                const topOffset = arrangeMetrics.topOffset;
+                const cardHeight = arrangeMetrics.cardHeight;
+                const fn = window.AmbientDreamUtils?.getArrangeXStart;
+                const xStart = typeof fn === 'function'
+                    ? fn({ viewportWidth: viewportProfile.width, cols, cardWidth, gapX, margin: 18 })
+                    : Math.max(18, Math.round((viewportProfile.width - (cols * cardWidth + (cols - 1) * gapX)) / 2));
+                return { cols, cardWidth, cardHeight, gapX, gapY, topOffset, xStart };
+            }, [arrangeMode, arrangeMetrics, viewportProfile.width]);
+
+            const getArrangeDisplayPos = React.useCallback((index) => {
+                if (!arrangeLayout) return null;
+                const col = index % arrangeLayout.cols;
+                const row = Math.floor(index / arrangeLayout.cols);
+                const center = (arrangeLayout.cols - 1) / 2;
+                return {
+                    x: arrangeLayout.xStart + col * (arrangeLayout.cardWidth + arrangeLayout.gapX),
+                    y: arrangeLayout.topOffset + row * (arrangeLayout.cardHeight + arrangeLayout.gapY),
+                    rot: (col - center) * 2
+                };
+            }, [arrangeLayout]);
+
             const handleArrangeToggle = () => {
                 if (mode !== 'editing') {
                     setMode('editing');
@@ -4342,7 +4428,7 @@
                     
                     {/* 掉落层 */}
                     <div className={`notes-layer ${arrangeMode ? 'arranged' : ''}`}>
-                        {visibleNotes.map(note => (
+                        {visibleNotes.map((note, index) => (
                             <MemoryNote 
                                 key={note.id} 
                                 id={note.id}
@@ -4350,7 +4436,7 @@
                                 theme={note.theme} 
                                 fontClass={note.fontClass}
                                 tags={note.tags}
-                                initialPos={note.pos} 
+                                initialPos={arrangeMode ? (getArrangeDisplayPos(index) || note.pos) : note.pos} 
                                 isFocused={focusedNoteId === note.id}
                                 onFocus={toggleNoteFocus}
                                 onMoveEnd={handleNoteMoveEnd}
@@ -4377,7 +4463,7 @@
                         <div className="hint">
                             <WhisperText
                                 imagery="风在读，你只需要慢一点。"
-                                literal="滚动鼠标或上滑屏幕，潜入意识深处"
+                                literal="上滑/下滚下一条，下滑/上滚上一条"
                                 forceLiteral={isUserInteracting}
                             />
                         </div>
