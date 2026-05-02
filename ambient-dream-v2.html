@@ -2234,6 +2234,7 @@
             orderMode: 'ambient-dream-order-mode',
             volume: 'ambient-dream-volume',
             comments: 'ambient-dream-comments',
+            currentIndex: 'ambient-dream-current-index',
             notes: 'ambient-dream-notes',
             arrange: 'ambient-dream-arrange',
             mode: 'ambient-dream-mode',
@@ -2588,7 +2589,10 @@
         // --- 主应用 ---
         const App = () => {
             const [comments, setComments] = React.useState([]);
-            const [currentIndex, setCurrentIndex] = React.useState(0);
+            const [currentIndex, setCurrentIndex] = React.useState(() => {
+                const stored = safeReadStorage(STORAGE_KEYS.currentIndex, 0);
+                return Number.isFinite(stored) ? Math.max(0, Math.floor(stored)) : 0;
+            });
             const [droppedNotes, setDroppedNotes] = React.useState(() => safeReadStorage(STORAGE_KEYS.notes, []));
             const [activeSeason, setActiveSeason] = React.useState(null);
             const [transitionSeason, setTransitionSeason] = React.useState(null);
@@ -2644,6 +2648,7 @@
             const [reunionNudgeOpen, setReunionNudgeOpen] = React.useState(false);
             const [audioEnergy, setAudioEnergy] = React.useState(0);
             const [isAutoReading, setIsAutoReading] = React.useState(false);
+            const [autoplayDelayPassed, setAutoplayDelayPassed] = React.useState(false);
             const [arrangePanelOpen, setArrangePanelOpen] = React.useState(false);
             const [viewportProfile, setViewportProfile] = React.useState(() => getViewportProfile());
             const [toasts, setToasts] = React.useState([]);
@@ -2970,6 +2975,20 @@
             }, [comments]);
 
             React.useEffect(() => {
+                if (!comments.length) return;
+                setCurrentIndex(prev => Math.max(0, Math.min(comments.length - 1, prev)));
+            }, [comments.length]);
+
+            React.useEffect(() => {
+                writeStorage(STORAGE_KEYS.currentIndex, currentIndex);
+            }, [currentIndex]);
+
+            React.useEffect(() => {
+                const t = window.setTimeout(() => setAutoplayDelayPassed(true), 3000);
+                return () => window.clearTimeout(t);
+            }, []);
+
+            React.useEffect(() => {
                 writeStorage(STORAGE_KEYS.volume, volume);
             }, [volume]);
 
@@ -3192,6 +3211,7 @@
 
             React.useEffect(() => {
                 if (autoplayAttemptedRef.current) return;
+                if (!autoplayDelayPassed) return;
                 if (!tracks.length) return;
                 if (currentTrackIndex < 0) {
                     setCurrentTrackIndex(0);
@@ -3199,7 +3219,7 @@
                 }
                 autoplayAttemptedRef.current = true;
                 attemptAutoplay(false);
-            }, [tracks.length, currentTrackIndex, attemptAutoplay]);
+            }, [tracks.length, currentTrackIndex, attemptAutoplay, autoplayDelayPassed]);
 
             React.useEffect(() => {
                 if (!pendingAutoplayRef.current) return;

@@ -8,3 +8,8 @@ test('index.html redirects to ambient-dream-v2.html', () => {
   assert.ok(html.includes('ambient-dream-v2.html'));
 });
 
+test('ambient-dream-v2.html persists current quote index and auto-plays music after 3s', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'ambient-dream-v2.html'), 'utf8');
+  assert.ok(html.includes('ambient-dream-current-index'));
+  assert.ok(html.includes('3000'));
+});
