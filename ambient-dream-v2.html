@@ -3185,8 +3185,18 @@
                 const audio = audioRef.current;
                 if (!audio || !tracks.length) return;
                 const idx = currentTrackIndex >= 0 ? currentTrackIndex : 0;
-                if (!tracks[idx]) return;
+                const targetTrack = tracks[idx];
+                if (!targetTrack) return;
                 if (currentTrackIndex < 0) setCurrentTrackIndex(idx);
+
+                // 先确保音源已经挂载，避免3秒定时触发时出现空播。
+                const expectedSrc = new URL(targetTrack.url, window.location.href).href;
+                if (audio.src !== expectedSrc) {
+                    audio.src = targetTrack.url;
+                    audio.load();
+                    setCurrentTime(0);
+                    setProgress(0);
+                }
                 audioContextRef.current?.resume?.().catch(() => {});
                 const prevMuted = audio.muted;
                 const prevVolume = audio.volume;
@@ -3198,7 +3208,7 @@
                     window.setTimeout(() => {
                         audio.muted = prevMuted;
                         audio.volume = volume;
-                    }, 0);
+                    }, 80);
                 } catch (e) {
                     audio.muted = prevMuted;
                     audio.volume = prevVolume;
@@ -3253,9 +3263,12 @@
             React.useEffect(() => {
                 const audio = audioRef.current;
                 if (!audio || currentTrackIndex < 0 || !tracks[currentTrackIndex]) return;
-                audio.src = tracks[currentTrackIndex].url;
-                setCurrentTime(0);
-                setProgress(0);
+                const nextSrc = new URL(tracks[currentTrackIndex].url, window.location.href).href;
+                if (audio.src !== nextSrc) {
+                    audio.src = tracks[currentTrackIndex].url;
+                    setCurrentTime(0);
+                    setProgress(0);
+                }
                 if (isPlaying) {
                     audio.play().catch(() => setIsPlaying(false));
                 }
