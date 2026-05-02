@@ -1894,6 +1894,55 @@
                 font-size: 19px;
             }
 
+            .main-stage.viewport-mobile .mobile-more-overlay {
+                position: absolute;
+                inset: 0;
+                z-index: 1400;
+                pointer-events: auto;
+            }
+
+            .main-stage.viewport-mobile .mobile-more-panel {
+                position: absolute;
+                right: 16px;
+                bottom: calc(var(--mobile-controls-h, 76px) + 22px);
+                width: min(260px, calc(100vw - 32px));
+                border-radius: 18px;
+                padding: 12px;
+                background: rgba(22, 24, 34, 0.72);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
+                box-shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
+            }
+
+            .main-stage.viewport-mobile .mobile-more-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+            }
+
+            .main-stage.viewport-mobile .mobile-more-btn {
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                background: rgba(255, 255, 255, 0.06);
+                color: rgba(244, 240, 235, 0.9);
+                border-radius: 14px;
+                min-height: 44px;
+                padding: 10px 12px;
+                font-family: inherit;
+                font-size: 13px;
+                letter-spacing: 0.08em;
+                cursor: pointer;
+                -webkit-appearance: none;
+                appearance: none;
+                transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+            }
+
+            .main-stage.viewport-mobile .mobile-more-btn:active {
+                transform: scale(0.98);
+                background: rgba(255, 255, 255, 0.1);
+                border-color: rgba(255, 255, 255, 0.2);
+            }
+
             .arrange-search-wrap {
                 grid-column: 1 / -1;
                 width: 100%;
@@ -2743,11 +2792,13 @@
             const [toasts, setToasts] = React.useState([]);
             const [mobileControlsHeight, setMobileControlsHeight] = React.useState(76);
             const [mobileOnboardingPhase, setMobileOnboardingPhase] = React.useState(null);
+            const [mobileMoreOpen, setMobileMoreOpen] = React.useState(false);
 
             const reducedMotion = useReducedMotion();
             const isMobile = viewportProfile.width <= 820;
             const isMobilePortrait = isMobile && viewportProfile.height > viewportProfile.width;
             const mobileDockExpanded = isMobile && (musicDockOpen || musicDockPinned);
+            const mobileMoreVisible = isMobile && mobileMoreOpen && !mobileDockExpanded;
             
             const activeTextRef = React.useRef(null);
             const wheelAcc = React.useRef(0);
@@ -2895,6 +2946,20 @@
                 if (!mobileOnboardingPhase) return;
                 stopMobileOnboarding();
             }, [reducedMotion, mobileOnboardingPhase, stopMobileOnboarding]);
+
+            React.useEffect(() => {
+                if (!isMobile) {
+                    if (mobileMoreOpen) setMobileMoreOpen(false);
+                    return;
+                }
+                if (mobileDockExpanded && mobileMoreOpen) setMobileMoreOpen(false);
+            }, [isMobile, mobileDockExpanded, mobileMoreOpen]);
+
+            React.useEffect(() => {
+                if (!isMobile) return;
+                if (!mobileMoreOpen) return;
+                if (isDirectoryOpen || isModalOpen || isTagEditorOpen) setMobileMoreOpen(false);
+            }, [isMobile, mobileMoreOpen, isDirectoryOpen, isModalOpen, isTagEditorOpen]);
 
             const arrangeMetrics = React.useMemo(() => {
                 const width = viewportProfile.width;
@@ -5055,14 +5120,10 @@
                                 setIsModalOpen(false);
                                 setIsDirectoryOpen(true);
                             }}>≡</button>
-                            <button type="button" className="soft-icon-btn" title={isPlaying ? '暂停' : '播放'} onClick={() => {
-                                if (!tracks.length) {
-                                    pushToast('还没有音乐');
-                                    setMusicDockOpen(true);
-                                    return;
-                                }
-                                togglePlayback();
-                            }}>{isPlaying ? '❚❚' : '▶'}</button>
+                            <button type="button" className="soft-icon-btn" title="更多" onClick={() => {
+                                if (mobileDockExpanded) return;
+                                setMobileMoreOpen(prev => !prev);
+                            }}>⋯</button>
                         </div>
                     ) : (
                         <div className={`controls ${mode === 'reading' ? 'compact' : ''}`}>
@@ -5213,6 +5274,52 @@
                         </div>
                     )}
 
+                    {mobileMoreVisible && (
+                        <div className="mobile-more-overlay" onClick={() => setMobileMoreOpen(false)}>
+                            <div className="mobile-more-panel" onClick={(e) => e.stopPropagation()}>
+                                <div className="mobile-more-grid">
+                                    <button type="button" className="mobile-more-btn" onClick={() => {
+                                        setIsAutoReading(prev => !prev);
+                                        setMobileMoreOpen(false);
+                                    }}>{isAutoReading ? '停读' : '自读'}</button>
+                                    <button type="button" className="mobile-more-btn" onClick={() => {
+                                        handleArrangeToggle();
+                                        setMobileMoreOpen(false);
+                                    }}>{arrangeMode ? '退出整理' : '整理'}</button>
+                                    <button type="button" className="mobile-more-btn" onClick={() => {
+                                        setUiProfile(prev => prev === 'classic' ? 'refined' : 'classic');
+                                        setMobileMoreOpen(false);
+                                    }}>{uiProfile === 'classic' ? '沉浸+' : '经典'}</button>
+                                    {mode === 'editing' && (
+                                        <button type="button" className="mobile-more-btn" onClick={() => {
+                                            undo();
+                                            setMobileMoreOpen(false);
+                                        }}>撤销</button>
+                                    )}
+                                    {mode === 'editing' && focusedNoteId != null && (
+                                        <button type="button" className="mobile-more-btn" onClick={() => {
+                                            setIsTagEditorOpen(true);
+                                            setMobileMoreOpen(false);
+                                        }}>标签</button>
+                                    )}
+                                    {mode === 'editing' && (
+                                        <button type="button" className="mobile-more-btn" onClick={() => {
+                                            clearAllNotes();
+                                            setMobileMoreOpen(false);
+                                        }}>清空</button>
+                                    )}
+                                    {mode === 'editing' && (
+                                        <button type="button" className="mobile-more-btn" onClick={() => {
+                                            setIsDirectoryOpen(false);
+                                            setIsModalOpen(true);
+                                            setMobileMoreOpen(false);
+                                        }}>新增</button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="chapter-badge">
                         <div className="stage-name">{chapterInfo.stage}</div>
                         <div className="stage-copy">{chapterInfo.copy}</div>
@@ -5226,16 +5333,18 @@
                     >
                         <div className="favorites-head">
                             <button type="button" className="favorites-head-main" onClick={() => setFavoritesOpen(prev => !prev)}>
-                                <div className="favorites-title">FAVORITES</div>
+                                <div className="favorites-title">{(isMobile && !(favoritesOpen || favoritesPinned)) ? 'FAV' : 'FAVORITES'}</div>
                             </button>
-                            <button
-                                type="button"
-                                className="profile-toggle-btn"
-                                onClick={() => setUiProfile(prev => prev === 'classic' ? 'refined' : 'classic')}
-                                title="切换界面呈现，不影响内容"
-                            >
-                                {uiProfile === 'classic' ? '沉浸+' : '经典'}
-                            </button>
+                            {!(isMobile && !(favoritesOpen || favoritesPinned)) && (
+                                <button
+                                    type="button"
+                                    className="profile-toggle-btn"
+                                    onClick={() => setUiProfile(prev => prev === 'classic' ? 'refined' : 'classic')}
+                                    title="切换界面呈现，不影响内容"
+                                >
+                                    {uiProfile === 'classic' ? '沉浸+' : '经典'}
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 className={`panel-icon-btn ${favoritesPinned ? 'active' : ''}`}
