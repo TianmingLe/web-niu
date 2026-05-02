@@ -33,29 +33,37 @@
   const createSummerMeadowLayout = ({ width, height, bladeCount, flowerCount, seed = 1 }) => {
     const w = Math.max(1, Number(width) || 1);
     const h = Math.max(1, Number(height) || 1);
-    const bladesN = Math.max(0, Math.floor(Number(bladeCount) || 0));
+    const grassN = Math.max(0, Math.floor(Number(bladeCount) || 0));
     const flowersN = Math.max(0, Math.floor(Number(flowerCount) || 0));
     const rng = mulberry32(seed);
     const margin = 80;
-    const blades = Array.from({ length: bladesN }, () => {
+    const grass = Array.from({ length: grassN }, (_, idx) => {
       const x = -margin + rng() * (w + margin * 2);
       const y = h * (0.70 + rng() * 0.28);
       const hh = 20 + rng() * 110;
+      const kindPick = rng();
+      const kind = kindPick < 0.64 ? 'blade' : kindPick < 0.86 ? 'seed' : 'broad';
       return {
+        kind,
         x,
         y,
         h: hh,
-        lean: (rng() - 0.5) * 0.55,
+        lean: (rng() - 0.5) * 0.65,
         phase: rng() * Math.PI * 2,
-        f: 0.7 + rng() * 1.2,
-        w: 0.7 + rng() * 1.2
+        f: 0.7 + rng() * 1.35,
+        w: 0.8 + rng() * 1.35,
+        split: kind === 'blade' ? (idx % 7 === 0) : false,
+        puff: kind === 'seed' ? (0.55 + rng() * 0.7) : 0
       };
     });
-    const flowers = Array.from({ length: flowersN }, () => {
+
+    const flowers = Array.from({ length: flowersN }, (_, idx) => {
       const x = -margin + rng() * (w + margin * 2);
       const y = h * (0.74 + rng() * 0.22);
-      const r = 1.8 + rng() * 2.8;
+      const kind = (idx % 5 === 0) ? 'clover' : 'daisy';
+      const r = 1.6 + rng() * 4.8;
       return {
+        kind,
         x,
         y,
         r,
@@ -63,7 +71,7 @@
         f: 0.8 + rng() * 1.4
       };
     });
-    return { blades, flowers };
+    return { grass, flowers };
   };
 
   return { getArrangeXStart, accumulateWheelNavigation, createSummerMeadowLayout, clamp };

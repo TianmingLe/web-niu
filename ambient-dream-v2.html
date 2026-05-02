@@ -2005,13 +2005,13 @@
 
             if (season === 'summer') {
                 const x = rng() * w;
-                const y = 40 + rng() * (h * 0.78);
+                const y = rng() * h;
                 return {
                     kind: 'firefly',
                     x,
                     y,
-                    vx: (rng() - 0.5) * 0.12,
-                    vy: -(0.03 + rng() * 0.09),
+                    vx: (rng() - 0.5) * 0.16,
+                    vy: (rng() - 0.5) * 0.12,
                     rot: 0,
                     vr: 0,
                     size: 1.2 + rng() * 2.6,
@@ -2060,14 +2060,14 @@
             const k = (dt / 16.67) * 10;
             if (p.kind === 'firefly') {
                 const s = t * 0.0013 + p.tw * Math.PI * 2;
-                const ax = Math.cos(s) * 0.18 + Math.sin(s * 1.7) * 0.10;
-                const ay = Math.sin(s * 1.3) * 0.12;
+                const ax = Math.cos(s) * 0.22 + Math.sin(s * 1.7) * 0.12;
+                const ay = Math.sin(s * 1.3) * 0.18 + Math.cos(s * 0.9) * 0.08;
                 p.x += (p.vx + ax) * k;
                 p.y += (p.vy + ay) * k;
                 if (p.x < -60) p.x = w + 40;
                 if (p.x > w + 60) p.x = -40;
-                if (p.y < 30) p.y = 30 + (p.seed || 0) * 40;
-                if (p.y > h - 30) p.y = h - 30;
+                if (p.y < -60) p.y = h + 40;
+                if (p.y > h + 60) p.y = -40;
                 return true;
             }
             if (p.kind === 'fog') {
@@ -3392,6 +3392,8 @@
                 let particlesB = [];
                 let ripplesA = [];
                 let ripplesB = [];
+                let pileA = [];
+                let pileB = [];
                 let disturb = null;
 
                 const setupCanvas = (canvas) => {
@@ -3446,13 +3448,13 @@
                     const tier = (reducedMotion || vfxLevel === 'low' || degraded) ? 'low' : 'high';
                     const existing = ctx.__summerMeadow;
                     if (existing && existing.w === geom.w && existing.h === geom.h && existing.tier === tier) return existing;
-                    const bladeCount = tier === 'low' ? 26 : 56;
-                    const flowerCount = tier === 'low' ? 50 : 110;
+                    const bladeCount = tier === 'low' ? 70 : 160;
+                    const flowerCount = tier === 'low' ? 90 : 190;
                     const factory = window.AmbientDreamUtils?.createSummerMeadowLayout;
                     const layout = (typeof factory === 'function')
                         ? factory({ width: geom.w, height: geom.h, bladeCount, flowerCount, seed: 7331 })
-                        : { blades: [], flowers: [] };
-                    const cache = { w: geom.w, h: geom.h, tier, blades: layout.blades || [], flowers: layout.flowers || [] };
+                        : { grass: [], flowers: [] };
+                    const cache = { w: geom.w, h: geom.h, tier, grass: layout.grass || [], flowers: layout.flowers || [] };
                     ctx.__summerMeadow = cache;
                     return cache;
                 };
@@ -3463,7 +3465,7 @@
                     const h = geom.h;
                     const low = cache.tier === 'low';
                     const wind = reducedMotion ? 0 : (low ? 0.85 : 1);
-                    const swayBase = (low ? 10 : 16) * wind;
+                    const swayBase = (low ? 12 : 18) * wind;
                     const k = (intensity ?? 1);
                     const fadeBottomStart = h * 0.90;
                     const fadeBottomEnd = h * 0.985;
@@ -3474,31 +3476,75 @@
                     ctx.lineCap = 'round';
                     const g = ctx.createLinearGradient(0, h * 0.68, 0, h);
                     g.addColorStop(0, 'rgba(56, 90, 82, 0.00)');
-                    g.addColorStop(1, 'rgba(56, 90, 82, 0.22)');
-                    ctx.globalAlpha = 0.55 * k;
+                    g.addColorStop(1, 'rgba(56, 90, 82, 0.30)');
+                    ctx.globalAlpha = 0.70 * k;
                     ctx.fillStyle = g;
                     ctx.fillRect(0, h * 0.68, w, h * 0.32);
 
-                    const drawBlade = (b, i) => {
+                    const drawGrassItem = (b, i) => {
                         if (b.y < safeTop) return;
                         const by = b.y;
                         const fadeBottom = by >= fadeBottomStart
                             ? Math.max(0, Math.min(1, 1 - (by - fadeBottomStart) / Math.max(1, (fadeBottomEnd - fadeBottomStart))))
                             : 1;
-                        const baseAlpha = (0.16 + 0.12 * Math.sin((t * 0.0008) + b.phase)) * k * fadeBottom;
+                        const baseAlpha = (0.18 + 0.14 * Math.sin((t * 0.0008) + b.phase)) * k * fadeBottom;
                         if (baseAlpha <= 0.002) return;
                         const sway = Math.sin(t * 0.0012 * b.f + b.phase) * swayBase;
                         const tipX = b.x + sway + b.lean * b.h * 0.6;
                         const tipY = by - b.h;
                         const midX = b.x + sway * 0.25 + b.lean * b.h * 0.32;
                         const midY = by - b.h * 0.55;
+                        if (b.kind === 'broad') {
+                            ctx.save();
+                            ctx.globalAlpha = Math.min(0.6, baseAlpha * 0.9);
+                            ctx.translate(b.x, by);
+                            ctx.rotate(b.lean * 0.35 + Math.sin(t * 0.0009 + b.phase) * 0.06);
+                            const leafW = 8 + b.w * 5;
+                            const leafH = 20 + b.h * 0.32;
+                            ctx.fillStyle = 'rgba(128, 192, 152, 0.70)';
+                            ctx.shadowColor = 'rgba(146, 210, 168, 0.22)';
+                            ctx.shadowBlur = 10;
+                            ctx.beginPath();
+                            ctx.moveTo(0, 0);
+                            ctx.quadraticCurveTo(leafW, -leafH * 0.42, 0, -leafH);
+                            ctx.quadraticCurveTo(-leafW, -leafH * 0.42, 0, 0);
+                            ctx.fill();
+                            ctx.restore();
+                            return;
+                        }
+
                         ctx.globalAlpha = baseAlpha;
-                        ctx.strokeStyle = (i % 7 === 0) ? 'rgba(210, 244, 220, 1)' : 'rgba(146, 210, 168, 1)';
+                        ctx.strokeStyle = (i % 9 === 0) ? 'rgba(210, 244, 220, 1)' : 'rgba(146, 210, 168, 1)';
                         ctx.lineWidth = b.w;
                         ctx.beginPath();
                         ctx.moveTo(b.x, by);
                         ctx.quadraticCurveTo(midX, midY, tipX, tipY);
                         ctx.stroke();
+
+                        if (b.kind === 'blade' && b.split) {
+                            ctx.globalAlpha = baseAlpha * 0.75;
+                            ctx.lineWidth = Math.max(0.7, b.w * 0.85);
+                            ctx.beginPath();
+                            ctx.moveTo(b.x + 0.8, by);
+                            ctx.quadraticCurveTo(midX + 6, midY + 6, tipX + 10, tipY + 8);
+                            ctx.stroke();
+                        }
+
+                        if (b.kind === 'seed') {
+                            const tw = 0.55 + 0.45 * Math.sin(t * 0.0022 * (b.f + 0.4) + b.phase);
+                            const puff = (b.puff || 0.7);
+                            ctx.save();
+                            ctx.globalAlpha = Math.min(0.55, baseAlpha * (0.9 + 0.25 * tw));
+                            ctx.translate(tipX, tipY);
+                            ctx.rotate(b.lean * 0.25);
+                            ctx.fillStyle = 'rgba(210, 236, 208, 0.65)';
+                            ctx.shadowColor = 'rgba(210, 236, 208, 0.28)';
+                            ctx.shadowBlur = 12 + 10 * tw;
+                            ctx.beginPath();
+                            ctx.ellipse(0, 0, 2.2 + puff * 4.2, 6.2 + puff * 9.4, 0.4, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.restore();
+                        }
                     };
 
                     const drawFlower = (f, i) => {
@@ -3510,36 +3556,65 @@
                             ? Math.max(0, Math.min(1, 1 - (fy - fadeStart) / Math.max(1, (fadeEnd - fadeStart))))
                             : 1;
                         const tw = 0.55 + 0.45 * Math.sin(t * 0.0040 * f.f + f.phase);
-                        const a = (0.24 + 0.22 * tw) * k * fadeBottom;
+                        const a = (0.22 + 0.26 * tw) * k * fadeBottom;
                         if (a <= 0.0015) return;
                         ctx.save();
                         ctx.globalAlpha = a;
-                        ctx.fillStyle = (i % 5 === 0) ? 'rgba(255, 190, 220, 1)' : 'rgba(248, 242, 230, 1)';
-                        ctx.shadowColor = (i % 5 === 0) ? 'rgba(255, 190, 220, 0.42)' : 'rgba(248, 242, 230, 0.38)';
-                        ctx.shadowBlur = 18 + 16 * tw;
-                        const rr = f.r * (0.9 + 0.25 * tw);
-                        const s = Math.sin(f.phase) * 0.6;
-                        const c = Math.cos(f.phase) * 0.6;
-                        ctx.beginPath();
-                        ctx.arc(f.x + rr * 0.9, fy + rr * 0.2, rr, 0, Math.PI * 2);
-                        ctx.arc(f.x - rr * 0.4 + s, fy - rr * 0.6 + c, rr * 0.92, 0, Math.PI * 2);
-                        ctx.arc(f.x - rr * 0.5 - c, fy + rr * 0.55 + s, rr * 0.88, 0, Math.PI * 2);
-                        ctx.fill();
+                        const rr = f.r * (0.72 + 0.30 * tw);
+                        if (f.kind === 'clover') {
+                            ctx.fillStyle = 'rgba(255, 205, 228, 1)';
+                            ctx.shadowColor = 'rgba(255, 205, 228, 0.42)';
+                            ctx.shadowBlur = 16 + 14 * tw;
+                            ctx.beginPath();
+                            ctx.arc(f.x + rr * 0.6, fy, rr, 0, Math.PI * 2);
+                            ctx.arc(f.x - rr * 0.6, fy, rr, 0, Math.PI * 2);
+                            ctx.arc(f.x, fy - rr * 0.7, rr, 0, Math.PI * 2);
+                            ctx.arc(f.x, fy + rr * 0.7, rr * 0.9, 0, Math.PI * 2);
+                            ctx.fill();
+                        } else {
+                            ctx.shadowColor = 'rgba(248, 242, 230, 0.36)';
+                            ctx.shadowBlur = 14 + 12 * tw;
+                            ctx.translate(f.x, fy);
+                            ctx.rotate(f.phase * 0.15);
+                            const petals = 6 + (i % 3);
+                            ctx.fillStyle = 'rgba(248, 242, 230, 1)';
+                            for (let p = 0; p < petals; p++) {
+                                const ang = (p / petals) * Math.PI * 2;
+                                const px = Math.cos(ang) * rr * 1.6;
+                                const py = Math.sin(ang) * rr * 1.1;
+                                ctx.beginPath();
+                                ctx.ellipse(px, py, rr * 0.9, rr * 0.52, ang, 0, Math.PI * 2);
+                                ctx.fill();
+                            }
+                            ctx.fillStyle = 'rgba(244, 214, 136, 1)';
+                            ctx.beginPath();
+                            ctx.arc(0, 0, rr * 0.72, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
                         ctx.restore();
                     };
 
-                    cache.blades.forEach(drawBlade);
+                    cache.grass.forEach(drawGrassItem);
                     cache.flowers.forEach(drawFlower);
                     ctx.restore();
                 };
 
-                const tickLayer = (season, geom, ctx, particles, ripples, rng, dt, t, clearZone, intensity) => {
+                const drawAutumnPile = (ctx, season, pile, t, intensity) => {
+                    if (!pile?.length) return;
+                    const k = intensity ?? 1;
+                    for (const p of pile) {
+                        drawSeasonParticle(ctx, season, p, t, k);
+                    }
+                };
+
+                const tickLayer = (season, geom, ctx, particles, ripples, pile, rng, dt, t, clearZone, intensity) => {
                     if (!ctx || !season) {
                         if (ctx) ctx.clearRect(0, 0, geom.w, geom.h);
-                        return { particles: [], ripples: [] };
+                        return { particles: [], ripples: [], pile: [] };
                     }
                     ctx.clearRect(0, 0, geom.w, geom.h);
                     if (season === 'summer') drawSummerMeadow(ctx, geom, t, clearZone, intensity);
+                    if (season === 'autumn') drawAutumnPile(ctx, season, pile, t, intensity);
                     const target = getTargetCount(season, intensity);
                     const spawnOutside = () => {
                         for (let i = 0; i < 14; i++) {
@@ -3584,6 +3659,19 @@
                                     else fade = base * base;
                                 }
                             }
+                            if (season === 'autumn' && p.kind === 'leaf' && p.y >= geom.h - 12) {
+                                const cap = (vfxLevel === 'low' || degraded) ? 80 : 180;
+                                const height = Math.min(140, 30 + (pile?.length || 0) * 0.42);
+                                const landed = {
+                                    ...p,
+                                    x: p.x + (rng() - 0.5) * 34,
+                                    y: geom.h - 10 - rng() * height,
+                                    alpha: Math.min(0.30, (p.alpha || 0.18) * 1.05)
+                                };
+                                drawSeasonParticle(ctx, season, landed, t, fade * (intensity ?? 1));
+                                pile = [...(pile || []), landed].slice(-cap);
+                                continue;
+                            }
                             drawSeasonParticle(ctx, season, p, t, fade * (intensity ?? 1));
                             nextParticles.push(p);
                         }
@@ -3593,7 +3681,7 @@
                     for (const r of ripples) {
                         if (drawRipple(ctx, r, t)) nextRipples.push(r);
                     }
-                    return { particles, ripples: nextRipples };
+                    return { particles, ripples: nextRipples, pile };
                 };
 
                 const loop = (t) => {
@@ -3630,14 +3718,16 @@
                             breath = 0.88 + 0.18 * e;
                         }
                     }
-                    const a = tickLayer(activeSeason, geomA, geomA.ctx, particlesA, ripplesA, rngA, dt, t, clearZone, breath);
+                    const a = tickLayer(activeSeason, geomA, geomA.ctx, particlesA, ripplesA, pileA, rngA, dt, t, clearZone, breath);
                     particlesA = a.particles;
                     ripplesA = a.ripples;
+                    pileA = a.pile;
 
                     const seasonB = isSeasonTransitioning ? transitionSeason : null;
-                    const b = tickLayer(seasonB, geomB, geomB.ctx, particlesB, ripplesB, rngB, dt, t, clearZone, breath);
+                    const b = tickLayer(seasonB, geomB, geomB.ctx, particlesB, ripplesB, pileB, rngB, dt, t, clearZone, breath);
                     particlesB = b.particles;
                     ripplesB = b.ripples;
+                    pileB = b.pile;
 
                     raf = window.requestAnimationFrame(loop);
                 };
