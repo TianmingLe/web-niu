@@ -2648,7 +2648,6 @@
             const [reunionNudgeOpen, setReunionNudgeOpen] = React.useState(false);
             const [audioEnergy, setAudioEnergy] = React.useState(0);
             const [isAutoReading, setIsAutoReading] = React.useState(false);
-            const [autoplayDelayPassed, setAutoplayDelayPassed] = React.useState(false);
             const [arrangePanelOpen, setArrangePanelOpen] = React.useState(false);
             const [viewportProfile, setViewportProfile] = React.useState(() => getViewportProfile());
             const [toasts, setToasts] = React.useState([]);
@@ -2671,6 +2670,8 @@
             const toastIdRef = React.useRef(0);
             const reunionNudgeTimerRef = React.useRef(null);
             const autoplayAttemptedRef = React.useRef(false);
+            const autoplayFnRef = React.useRef(null);
+            const isPlayingRef = React.useRef(false);
             const pendingAutoplayRef = React.useRef(false);
             const historyRef = React.useRef([]);
             const historyLockRef = React.useRef(false);
@@ -2984,11 +2985,6 @@
             }, [currentIndex]);
 
             React.useEffect(() => {
-                const t = window.setTimeout(() => setAutoplayDelayPassed(true), 3000);
-                return () => window.clearTimeout(t);
-            }, []);
-
-            React.useEffect(() => {
                 writeStorage(STORAGE_KEYS.volume, volume);
             }, [volume]);
 
@@ -3210,16 +3206,30 @@
             }, [currentTrackIndex, pushToast, tracks, volume]);
 
             React.useEffect(() => {
-                if (autoplayAttemptedRef.current) return;
-                if (!autoplayDelayPassed) return;
-                if (!tracks.length) return;
-                if (currentTrackIndex < 0) {
-                    setCurrentTrackIndex(0);
-                    return;
-                }
-                autoplayAttemptedRef.current = true;
-                attemptAutoplay(false);
-            }, [tracks.length, currentTrackIndex, attemptAutoplay, autoplayDelayPassed]);
+                autoplayFnRef.current = attemptAutoplay;
+            }, [attemptAutoplay]);
+
+            React.useEffect(() => {
+                isPlayingRef.current = isPlaying;
+            }, [isPlaying]);
+
+            React.useEffect(() => {
+                const t = window.setTimeout(() => {
+                    if (autoplayAttemptedRef.current) return;
+                    autoplayAttemptedRef.current = true;
+                    let tries = 0;
+                    const id = window.setInterval(() => {
+                        if (isPlayingRef.current) {
+                            window.clearInterval(id);
+                            return;
+                        }
+                        tries += 1;
+                        autoplayFnRef.current && autoplayFnRef.current(false);
+                        if (tries >= 12) window.clearInterval(id);
+                    }, 500);
+                }, 3000);
+                return () => window.clearTimeout(t);
+            }, []);
 
             React.useEffect(() => {
                 if (!pendingAutoplayRef.current) return;
