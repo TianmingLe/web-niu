@@ -1519,13 +1519,15 @@
 
         .whisper {
             position: relative;
-            display: inline-block;
+            display: inline-grid;
+            place-items: center;
             max-width: min(72vw, 720px);
         }
 
         .whisper-a,
         .whisper-b {
             display: inline-block;
+            grid-area: 1 / 1;
             transition: opacity 1.4s ease, transform 1.4s ease, filter 1.4s ease;
             will-change: opacity, transform, filter;
             white-space: nowrap;
@@ -1535,8 +1537,8 @@
 
         .whisper-a.out { opacity: 0; transform: translateY(-2px); filter: blur(1px); }
         .whisper-a.in { opacity: 1; transform: translateY(0); filter: blur(0); }
-        .whisper-b.out { opacity: 0; transform: translateY(2px); filter: blur(1px); position: absolute; left: 0; top: 0; }
-        .whisper-b.in { opacity: 1; transform: translateY(0); filter: blur(0); position: absolute; left: 0; top: 0; }
+        .whisper-b.out { opacity: 0; transform: translateY(2px); filter: blur(1px); }
+        .whisper-b.in { opacity: 1; transform: translateY(0); filter: blur(0); }
 
         .breath-progress {
             position: absolute;
@@ -2671,7 +2673,8 @@
             const reunionNudgeTimerRef = React.useRef(null);
             const autoplayAttemptedRef = React.useRef(false);
             const autoplayFnRef = React.useRef(null);
-            const isPlayingRef = React.useRef(false);
+            const tracksLenRef = React.useRef(0);
+            const autoplayReadyRef = React.useRef(false);
             const pendingAutoplayRef = React.useRef(false);
             const historyRef = React.useRef([]);
             const historyLockRef = React.useRef(false);
@@ -3210,26 +3213,27 @@
             }, [attemptAutoplay]);
 
             React.useEffect(() => {
-                isPlayingRef.current = isPlaying;
-            }, [isPlaying]);
+                tracksLenRef.current = tracks.length;
+            }, [tracks.length]);
 
             React.useEffect(() => {
                 const t = window.setTimeout(() => {
+                    autoplayReadyRef.current = true;
                     if (autoplayAttemptedRef.current) return;
+                    if (tracksLenRef.current <= 0) return;
                     autoplayAttemptedRef.current = true;
-                    let tries = 0;
-                    const id = window.setInterval(() => {
-                        if (isPlayingRef.current) {
-                            window.clearInterval(id);
-                            return;
-                        }
-                        tries += 1;
-                        autoplayFnRef.current && autoplayFnRef.current(false);
-                        if (tries >= 12) window.clearInterval(id);
-                    }, 500);
+                    autoplayFnRef.current && autoplayFnRef.current(false);
                 }, 3000);
                 return () => window.clearTimeout(t);
             }, []);
+
+            React.useEffect(() => {
+                if (!autoplayReadyRef.current) return;
+                if (autoplayAttemptedRef.current) return;
+                if (!tracks.length) return;
+                autoplayAttemptedRef.current = true;
+                autoplayFnRef.current && autoplayFnRef.current(false);
+            }, [tracks.length]);
 
             React.useEffect(() => {
                 if (!pendingAutoplayRef.current) return;
