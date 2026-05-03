@@ -16,23 +16,38 @@
 
 ## 快速开始
 
-这是一个纯前端静态项目，不需要安装依赖。
+这是一个纯前端项目，使用 Vite 构建与预览（用于 Vercel 一键部署与更稳定的线上加载）。
 
-### 方式 A：用 Python 起本地静态服务（推荐）
+### 方式 A：本地开发（推荐）
 
-在项目目录执行：
+在项目目录执行（首次需要安装依赖）：
 
 ```bash
-python3 -m http.server 8000
+npm install
+npm run dev
+```
+
+打开（Vite 默认端口）：
+
+- http://127.0.0.1:5173/
+  - 若你看到端口不是 5173，以终端输出为准
+
+### 方式 B：构建与本地预览（接近线上）
+
+```bash
+npm run build
+npm run preview
 ```
 
 打开：
 
-- http://127.0.0.1:8000/ambient-dream-v2.html
+- http://127.0.0.1:4173/
 
-### 方式 B：直接双击打开
+### 方式 C：部署到 Vercel
 
-可以直接打开 `ambient-dream-v2.html`，但部分浏览器对本地 `fetch()` 有限制，建议优先使用方式 A。
+- 在 Vercel 导入仓库即可（会识别为 Vite）
+- Build Command：`npm run build`
+- Output Directory：`dist`
 
 ## 操作说明（常用）
 
@@ -45,8 +60,9 @@ python3 -m http.server 8000
 
 ## 音乐
 
-- 页面支持上传本地音频（mp3 / wav / ogg），也可使用仓库内 `music/` 的示例文件。
+- 页面支持上传本地音频（mp3 / wav / ogg），也可使用仓库内 `public/music/` 的示例文件。
 - 音乐播放列表与状态会保存在浏览器本地存储中。
+- Vercel 静态站不提供目录列表，因此内置曲库通过 `public/music/manifest.json`（构建时生成）加载。
 
 ## 数据存储与导入导出
 
@@ -55,8 +71,8 @@ python3 -m http.server 8000
 
 ## 文件说明
 
-- `ambient-dream-v2.html`：主页面（包含主要逻辑与样式）
-- `ambient-dream-utils.js`：少量可复用的纯函数（排布/草花布局等）
-- `comments.json`：默认语录数据
-- `music/`：示例音乐
-
+- `index.html`：主入口（样式 + 根节点）
+- `src/main.jsx`：主逻辑（React）
+- `src/ambient-dream-utils.js`：少量可复用的纯函数（排布/草花布局等）
+- `public/comments.json`：默认语录数据
+- `public/music/`：示例音乐与曲库清单

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-03T01:26:28.747Z",
+  "tracks": [
+    {
+      "name": "未闻花名钢琴",
+      "file": "未闻花名钢琴.MP3"
+    },
+    {
+      "name": "未闻花名吉他",
+      "file": "未闻花名吉他.MP3"
+    },
+    {
+      "name": "我记得纯音乐+小管弦长版",
+      "file": "我记得纯音乐+小管弦长版.MP3"
+    },
+    {
+      "name": "雨中舞",
+      "file": "雨中舞.MP3"
+    },
+    {
+      "name": "oldmemoroy",
+      "file": "oldmemoroy.MP3"
+    }
+  ]
+}
