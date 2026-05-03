@@ -4,6 +4,8 @@ import { gsap } from 'gsap';
 import { Draggable } from 'gsap/Draggable';
 import * as AmbientDreamUtils from './ambient-dream-utils';
 import { buildMusicUrlCandidates } from './music-url.mjs';
+import { putMusicBlob, getMusicBlob, deleteMusicBlob } from './music-blob-store.mjs';
+import { serializeTracksForStorage } from './music-track-storage.mjs';
 
 gsap.registerPlugin(Draggable);
 window.AmbientDreamUtils = AmbientDreamUtils;
@@ -1220,6 +1222,26 @@ window.AmbientDreamUtils = AmbientDreamUtils;
             }, []);
 
             React.useEffect(() => {
+                const stored = safeReadStorage(STORAGE_KEYS.tracks, []);
+                const list = Array.isArray(stored) ? stored : [];
+                const uploads = list.filter(t => t && t.source === 'upload' && typeof t.blobKey === 'string' && t.blobKey);
+                if (!uploads.length) return;
+                Promise.all(uploads.map(async (t) => {
+                    const blob = await getMusicBlob(t.blobKey);
+                    if (!blob) return null;
+                    const url = URL.createObjectURL(blob);
+                    return { ...t, url };
+                })).then((restored) => {
+                    const nextUploads = restored.filter(Boolean);
+                    if (!nextUploads.length) return;
+                    setTracks(prev => {
+                        const keep = prev.filter(t => !(t && t.source === 'upload'));
+                        return [...keep, ...nextUploads];
+                    });
+                }).catch(() => {});
+            }, []);
+
+            React.useEffect(() => {
                 writeStorage(STORAGE_KEYS.comments, comments);
             }, [comments]);
 
@@ -1245,7 +1267,7 @@ window.AmbientDreamUtils = AmbientDreamUtils;
             }, [favorites]);
 
             React.useEffect(() => {
-                writeStorage(STORAGE_KEYS.tracks, tracks);
+                writeStorage(STORAGE_KEYS.tracks, serializeTracksForStorage(tracks));
             }, [tracks]);
 
             React.useEffect(() => {
@@ -2488,16 +2510,23 @@ window.AmbientDreamUtils = AmbientDreamUtils;
             const handleMusicUpload = (event) => {
                 const files = Array.from(event.target.files || []).filter(file => file.type.startsWith('audio/'));
                 if (!files.length) return;
-                Promise.all(files.map(file => new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve({
-                        id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
-                        name: file.name.replace(/\.[^/.]+$/, ''),
-                        url: reader.result,
+                Promise.all(files.map(async (file) => {
+                    const id = `${file.name}-${file.size}-${Date.now()}-${Math.random()}`;
+                    const name = file.name.replace(/\.[^/.]+$/, '');
+                    const blobKey = `upload-${id}`;
+                    await putMusicBlob(blobKey, file);
+                    const url = URL.createObjectURL(file);
+                    return {
+                        id,
+                        name,
+                        url,
+                        blobKey,
+                        mimeType: file.type,
+                        size: file.size,
+                        lastModified: file.lastModified,
                         source: 'upload'
-                    });
-                    reader.readAsDataURL(file);
-                }))).then((uploaded) => {
+                    };
+                })).then((uploaded) => {
                     setTracks(prev => {
                         const next = [...prev, ...uploaded];
                         if (currentTrackIndex === -1 && next.length) {
@@ -2505,7 +2534,7 @@ window.AmbientDreamUtils = AmbientDreamUtils;
                         }
                         return next;
                     });
-                });
+                }).catch(() => pushToast('上传失败：存储空间不足或浏览器限制'));
                 event.target.value = '';
             };
 
@@ -2642,6 +2671,7 @@ window.AmbientDreamUtils = AmbientDreamUtils;
             const removeTrack = (index) => {
                 setTracks(prev => {
                     const a = [...prev];
+                    const removed = a[index];
                     a.splice(index,1);
                     if (!a.length) {
                         setCurrentTrackIndex(-1);
@@ -2650,6 +2680,14 @@ window.AmbientDreamUtils = AmbientDreamUtils;
                         setCurrentTrackIndex(index % a.length);
                     } else if (index < currentTrackIndex) {
                         setCurrentTrackIndex(currentTrackIndex - 1);
+                    }
+                    if (removed && removed.source === 'upload') {
+                        if (removed.url && String(removed.url).startsWith('blob:')) {
+                            try { URL.revokeObjectURL(removed.url); } catch {}
+                        }
+                        if (removed.blobKey) {
+                            deleteMusicBlob(String(removed.blobKey)).catch(() => {});
+                        }
                     }
                     return a;
                 });
