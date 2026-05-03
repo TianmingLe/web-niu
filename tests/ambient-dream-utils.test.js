@@ -1,8 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-test('getArrangeXStart centers grid when there is room', () => {
-  const { getArrangeXStart } = require('../ambient-dream-utils.js');
+test('getArrangeXStart centers grid when there is room', async () => {
+  const { getArrangeXStart } = await import('../src/ambient-dream-utils.js');
   const xStart = getArrangeXStart({
     viewportWidth: 1200,
     cols: 3,
@@ -13,8 +13,8 @@ test('getArrangeXStart centers grid when there is room', () => {
   assert.equal(xStart, 220);
 });
 
-test('accumulateWheelNavigation triggers prev on upward scroll', () => {
-  const { accumulateWheelNavigation } = require('../ambient-dream-utils.js');
+test('accumulateWheelNavigation triggers prev on upward scroll', async () => {
+  const { accumulateWheelNavigation } = await import('../src/ambient-dream-utils.js');
   let state = { acc: 0 };
   state = accumulateWheelNavigation({ acc: state.acc, deltaY: -120, threshold: 300 });
   assert.equal(state.action, null);
@@ -23,8 +23,8 @@ test('accumulateWheelNavigation triggers prev on upward scroll', () => {
   assert.equal(state.acc, 0);
 });
 
-test('createSummerMeadowLayout supports very high grass-to-flower ratio', () => {
-  const { createSummerMeadowLayout } = require('../ambient-dream-utils.js');
+test('createSummerMeadowLayout supports very high grass-to-flower ratio', async () => {
+  const { createSummerMeadowLayout } = await import('../src/ambient-dream-utils.js');
   const out = createSummerMeadowLayout({
     width: 1000,
     height: 800,

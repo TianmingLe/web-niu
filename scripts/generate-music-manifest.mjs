@@ -33,7 +33,6 @@ const main = async () => {
 
   const payload = {
     version: 1,
-    generatedAt: new Date().toISOString(),
     tracks
   };
 
@@ -44,4 +43,3 @@ main().catch((e) => {
   console.error(e);
   process.exitCode = 1;
 });
-
