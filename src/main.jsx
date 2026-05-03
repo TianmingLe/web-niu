@@ -1160,7 +1160,7 @@ window.AmbientDreamUtils = AmbientDreamUtils;
                     setCurrentTime(audio.currentTime);
                     setProgress((audio.currentTime / audio.duration) * 100);
                 };
-                const handleError = () => {
+                const tryFallback = () => {
                     const idx = currentTrackIndexRef.current;
                     const track = (tracksRef.current || [])[idx];
                     if (track && Array.isArray(track.altUrls) && track.altUrls.length) {
@@ -1176,19 +1176,28 @@ window.AmbientDreamUtils = AmbientDreamUtils;
                                 audio.play().catch(() => setIsPlaying(false));
                                 setIsPlaying(true);
                             }
-                            return;
+                            return true;
                         }
                     }
+                    return false;
+                };
+
+                const handleError = () => {
+                    if (tryFallback()) return;
                     pushToast('音乐加载失败：请检查文件或刷新曲库');
+                };
+
+                const handleStalled = () => {
+                    tryFallback();
                 };
                 audio.addEventListener('timeupdate', handleTime);
                 audio.addEventListener('error', handleError);
-                audio.addEventListener('stalled', handleError);
+                audio.addEventListener('stalled', handleStalled);
                 return () => {
                     audio.pause();
                     audio.removeEventListener('timeupdate', handleTime);
                     audio.removeEventListener('error', handleError);
-                    audio.removeEventListener('stalled', handleError);
+                    audio.removeEventListener('stalled', handleStalled);
                     tracks.forEach(track => {
                         if (track.url.startsWith('blob:')) URL.revokeObjectURL(track.url);
                     });
