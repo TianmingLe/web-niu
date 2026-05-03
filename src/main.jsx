@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { gsap } from 'gsap';
 import { Draggable } from 'gsap/Draggable';
 import * as AmbientDreamUtils from './ambient-dream-utils';
+import { buildMusicUrlCandidates } from './music-url.mjs';
 
 gsap.registerPlugin(Draggable);
 window.AmbientDreamUtils = AmbientDreamUtils;
@@ -756,6 +757,9 @@ window.AmbientDreamUtils = AmbientDreamUtils;
             const tracksLenRef = React.useRef(0);
             const autoplayReadyRef = React.useRef(false);
             const pendingAutoplayRef = React.useRef(false);
+            const isPlayingRef = React.useRef(false);
+            const currentTrackIndexRef = React.useRef(-1);
+            const tracksRef = React.useRef([]);
             const historyRef = React.useRef([]);
             const historyLockRef = React.useRef(false);
             const seasonStageRef = React.useRef(null);
@@ -1156,7 +1160,27 @@ window.AmbientDreamUtils = AmbientDreamUtils;
                     setCurrentTime(audio.currentTime);
                     setProgress((audio.currentTime / audio.duration) * 100);
                 };
-                const handleError = () => pushToast('音乐加载失败：请检查文件或刷新曲库');
+                const handleError = () => {
+                    const idx = currentTrackIndexRef.current;
+                    const track = (tracksRef.current || [])[idx];
+                    if (track && Array.isArray(track.altUrls) && track.altUrls.length) {
+                        const triedKey = `fallback-${track.id || track.url}`;
+                        const tried = (audio.__ambientTried || (audio.__ambientTried = {}));
+                        const cursor = Number.isFinite(tried[triedKey]) ? tried[triedKey] : 0;
+                        if (cursor < track.altUrls.length) {
+                            const nextUrl = track.altUrls[cursor];
+                            tried[triedKey] = cursor + 1;
+                            audio.src = nextUrl;
+                            audio.load();
+                            if (pendingAutoplayRef.current || isPlayingRef.current) {
+                                audio.play().catch(() => setIsPlaying(false));
+                                setIsPlaying(true);
+                            }
+                            return;
+                        }
+                    }
+                    pushToast('音乐加载失败：请检查文件或刷新曲库');
+                };
                 audio.addEventListener('timeupdate', handleTime);
                 audio.addEventListener('error', handleError);
                 audio.addEventListener('stalled', handleError);
@@ -1170,6 +1194,21 @@ window.AmbientDreamUtils = AmbientDreamUtils;
                     });
                 };
             }, [pushToast]);
+
+            React.useEffect(() => {
+                setTracks(prev => prev.map(t => {
+                    if (!t || typeof t.url !== 'string') return t;
+                    if (!t.url.startsWith('/music/')) return t;
+                    const file = decodeURIComponent(t.url.split('/').pop() || '');
+                    const candidates = buildMusicUrlCandidates(file);
+                    if (!candidates.length) return t;
+                    const primary = candidates[0];
+                    const merged = Array.from(new Set([...candidates.slice(1), t.url, ...(Array.isArray(t.altUrls) ? t.altUrls : [])].filter(Boolean)));
+                    const altUrls = merged.filter(u => u !== primary);
+                    if (t.url === primary && JSON.stringify(t.altUrls || []) === JSON.stringify(altUrls)) return t;
+                    return { ...t, url: primary, altUrls };
+                }));
+            }, []);
 
             React.useEffect(() => {
                 writeStorage(STORAGE_KEYS.comments, comments);
@@ -1364,8 +1403,10 @@ window.AmbientDreamUtils = AmbientDreamUtils;
                                 const file = String(t?.file || '').trim();
                                 if (!file || !/\.(mp3|wav|ogg)$/i.test(file)) return null;
                                 const name = String(t?.name || file.replace(/\.[^/.]+$/, '')).trim() || file.replace(/\.[^/.]+$/, '');
-                                const url = `/music/${encodeURIComponent(file)}`.replace(/%2F/g, '/');
-                                return { id: `lib-${name}-${file}`, name, url, source: 'library' };
+                                const urls = buildMusicUrlCandidates(file);
+                                const url = urls[0] || `/music/${encodeURI(file)}`;
+                                const altUrls = urls.slice(1);
+                                return { id: `lib-${name}-${file}`, name, url, altUrls, source: 'library' };
                             })
                             .filter(Boolean);
                         mergeCandidates(candidates);
@@ -1443,6 +1484,18 @@ window.AmbientDreamUtils = AmbientDreamUtils;
             React.useEffect(() => {
                 tracksLenRef.current = tracks.length;
             }, [tracks.length]);
+
+            React.useEffect(() => {
+                isPlayingRef.current = isPlaying;
+            }, [isPlaying]);
+
+            React.useEffect(() => {
+                currentTrackIndexRef.current = currentTrackIndex;
+            }, [currentTrackIndex]);
+
+            React.useEffect(() => {
+                tracksRef.current = tracks;
+            }, [tracks]);
 
             React.useEffect(() => {
                 const t = window.setTimeout(() => {
