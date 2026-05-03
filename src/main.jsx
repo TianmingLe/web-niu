@@ -7,6 +7,7 @@ import { buildMusicUrlCandidates } from './music-url.mjs';
 import { putMusicBlob, getMusicBlob, deleteMusicBlob } from './music-blob-store.mjs';
 import { serializeTracksForStorage } from './music-track-storage.mjs';
 import { tracksFromManifest } from './music-library.mjs';
+import { useMusicAutoplay } from './music-autoplay.mjs';
 
 gsap.registerPlugin(Draggable);
 window.AmbientDreamUtils = AmbientDreamUtils;
@@ -755,10 +756,6 @@ window.AmbientDreamUtils = AmbientDreamUtils;
             const seekCleanupRef = React.useRef(null);
             const toastIdRef = React.useRef(0);
             const reunionNudgeTimerRef = React.useRef(null);
-            const autoplayAttemptedRef = React.useRef(false);
-            const autoplayFnRef = React.useRef(null);
-            const tracksLenRef = React.useRef(0);
-            const autoplayReadyRef = React.useRef(false);
             const pendingAutoplayRef = React.useRef(false);
             const isPlayingRef = React.useRef(false);
             const currentTrackIndexRef = React.useRef(-1);
@@ -1504,14 +1501,6 @@ window.AmbientDreamUtils = AmbientDreamUtils;
             }, [currentTrackIndex, pushToast, tracks, volume]);
 
             React.useEffect(() => {
-                autoplayFnRef.current = attemptAutoplay;
-            }, [attemptAutoplay]);
-
-            React.useEffect(() => {
-                tracksLenRef.current = tracks.length;
-            }, [tracks.length]);
-
-            React.useEffect(() => {
                 isPlayingRef.current = isPlaying;
             }, [isPlaying]);
 
@@ -1523,39 +1512,13 @@ window.AmbientDreamUtils = AmbientDreamUtils;
                 tracksRef.current = tracks;
             }, [tracks]);
 
-            React.useEffect(() => {
-                const t = window.setTimeout(() => {
-                    autoplayReadyRef.current = true;
-                    if (autoplayAttemptedRef.current) return;
-                    if (tracksLenRef.current <= 0) return;
-                    autoplayAttemptedRef.current = true;
-                    autoplayFnRef.current && autoplayFnRef.current(false);
-                }, 3000);
-                return () => window.clearTimeout(t);
-            }, []);
-
-            React.useEffect(() => {
-                if (!autoplayReadyRef.current) return;
-                if (autoplayAttemptedRef.current) return;
-                if (!tracks.length) return;
-                autoplayAttemptedRef.current = true;
-                autoplayFnRef.current && autoplayFnRef.current(false);
-            }, [tracks.length]);
-
-            React.useEffect(() => {
-                if (!pendingAutoplayRef.current) return;
-                const handler = () => {
-                    window.removeEventListener('pointerdown', handler);
-                    window.removeEventListener('keydown', handler);
-                    attemptAutoplay(true);
-                };
-                window.addEventListener('pointerdown', handler, { passive: true });
-                window.addEventListener('keydown', handler);
-                return () => {
-                    window.removeEventListener('pointerdown', handler);
-                    window.removeEventListener('keydown', handler);
-                };
-            }, [attemptAutoplay]);
+            const AUTOPLAY_DELAY_MS = 3000;
+            useMusicAutoplay({
+                delayMs: AUTOPLAY_DELAY_MS,
+                tracksLength: tracks.length,
+                pendingAutoplayRef,
+                attemptAutoplay,
+            });
 
             React.useEffect(() => {
                 const audio = audioRef.current;
