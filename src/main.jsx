@@ -6,6 +6,7 @@ import * as AmbientDreamUtils from './ambient-dream-utils';
 import { buildMusicUrlCandidates } from './music-url.mjs';
 import { putMusicBlob, getMusicBlob, deleteMusicBlob } from './music-blob-store.mjs';
 import { serializeTracksForStorage } from './music-track-storage.mjs';
+import { tracksFromManifest } from './music-library.mjs';
 
 gsap.registerPlugin(Draggable);
 window.AmbientDreamUtils = AmbientDreamUtils;
@@ -1428,22 +1429,16 @@ window.AmbientDreamUtils = AmbientDreamUtils;
                     const res = await fetch('/music/manifest.json', { cache: 'no-store' });
                     if (res.ok) {
                         const data = await res.json();
-                        const list = Array.isArray(data?.tracks) ? data.tracks : [];
-                        const candidates = list
-                            .map(t => {
-                                const file = String(t?.file || '').trim();
-                                if (!file || !/\.(mp3|wav|ogg)$/i.test(file)) return null;
-                                const name = String(t?.name || file.replace(/\.[^/.]+$/, '')).trim() || file.replace(/\.[^/.]+$/, '');
-                                const urls = buildMusicUrlCandidates(file);
-                                const url = urls[0] || `/music/${encodeURI(file)}`;
-                                const altUrls = urls.slice(1);
-                                return { id: `lib-${name}-${file}`, name, url, altUrls, source: 'library' };
-                            })
-                            .filter(Boolean);
+                        const candidates = tracksFromManifest(data);
                         mergeCandidates(candidates);
                         return;
                     }
                 } catch (e) {
+                }
+
+                if (!import.meta.env.DEV) {
+                    pushToast('曲库加载失败：未找到 manifest.json（请重新构建/上传）');
+                    return;
                 }
 
                 try {
